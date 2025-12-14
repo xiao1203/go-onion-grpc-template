@@ -1,7 +1,16 @@
-.PHONY: test run
+.PHONY: up down logs sh test
+
+up:
+	docker compose up -d --build
+
+down:
+	docker compose down
+
+logs:
+	docker compose logs -f api
+
+sh:
+	docker compose exec api bash
 
 test:
-	go test ./...
-
-run:
-	go run ./cmd/server
+	docker compose exec api ./scripts/test.sh

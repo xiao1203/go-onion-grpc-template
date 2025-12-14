@@ -1,0 +1,82 @@
+services:
+  api:
+    build:
+      context: .
+      target: dev
+    container_name: go_api
+    working_dir: /app
+    volumes:
+      - ./:/app
+      - go_mod_cache:/go/pkg/mod
+      - go_build_cache:/root/.cache/go-build
+    environment:
+      # dev DB
+      DB_HOST: mysql_dev
+      DB_PORT: "3306"
+      DB_USER: app
+      DB_PASS: apppass
+      DB_NAME: app_dev
+      # test DB（テスト実行時に使う）
+      TEST_DB_HOST: mysql_test
+      TEST_DB_PORT: "3306"
+      TEST_DB_USER: app
+      TEST_DB_PASS: apppass
+      TEST_DB_NAME: app_test
+    ports:
+      - "8080:8080"
+    depends_on:
+      mysql_dev:
+        condition: service_healthy
+      mysql_test:
+        condition: service_healthy
+
+  mysql_dev:
+    image: mysql:8.4
+    container_name: mysql_dev
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: app_dev
+      MYSQL_USER: app
+      MYSQL_PASSWORD: apppass
+      TZ: Asia/Tokyo
+    ports:
+      - "13306:3306" # ホストから触りたい時用（任意）
+    volumes:
+      - mysql_dev_data:/var/lib/mysql
+      # - ./docker/mysql/dev-init:/docker-entrypoint-initdb.d:ro  # 任意
+    healthcheck:
+      test:
+        ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -prootpass --silent"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+
+  mysql_test:
+    image: mysql:8.4
+    container_name: mysql_test
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: app_test
+      MYSQL_USER: app
+      MYSQL_PASSWORD: apppass
+      TZ: Asia/Tokyo
+    ports:
+      - "23306:3306" # 任意
+    # テストDBは毎回クリーンにしたいなら tmpfs 推奨（速い＆消える）
+    tmpfs:
+      - /var/lib/mysql
+    # volumes:
+    #   - mysql_test_data:/var/lib/mysql   # 永続化したいならこっち
+    # - ./docker/mysql/test-init:/docker-entrypoint-initdb.d:ro  # 任意
+    healthcheck:
+      test:
+        ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -prootpass --silent"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+
+volumes:
+  mysql_dev_data:
+  # mysql_test_data:
+  go_mod_cache:
+  go_build_cache:
