@@ -75,6 +75,17 @@ services:
       timeout: 3s
       retries: 40
 
+  mysqldef:
+    image: sqldef/mysqldef:latest
+    # entrypoint はイメージ側で ["sqldef"] になっているので command は不要
+    # 実行は `docker compose run --rm mysqldef ...` で行う
+    volumes:
+      - ./db:/db:ro
+    depends_on:
+      mysql_dev:
+        condition: service_healthy
+      mysql_test:
+        condition: service_healthy
 volumes:
   mysql_dev_data:
   # mysql_test_data:
