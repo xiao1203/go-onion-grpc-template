@@ -10,7 +10,7 @@ import (
 	"github.com/xiao1203/go-onion-grpc-template/internal/adapter/repository/memory"
 	"github.com/xiao1203/go-onion-grpc-template/internal/usecase"
 
-	// scaffold:imports (DO NOT REMOVE)
+		// scaffold:imports (DO NOT REMOVE)
 )
 
 func main() {
@@ -25,7 +25,9 @@ func main() {
 
 	// scaffold:routes (DO NOT REMOVE)
 
-	addr := "127.0.0.1:8080"
-	fmt.Printf("listening on http://%s\n", addr)
+
+
+	addr := ":8080"
+	fmt.Printf("listening on %s\n", addr)
 	log.Fatal(http.ListenAndServe(addr, mux))
 }

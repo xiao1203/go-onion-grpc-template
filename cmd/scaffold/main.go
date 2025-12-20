@@ -1,267 +1,267 @@
 package main
 
 import (
-    "bytes"
-    "errors"
-    "flag"
-    "fmt"
-    "os"
-    "path/filepath"
-    "regexp"
-    "strings"
-    "text/template"
+	"bytes"
+	"errors"
+	"flag"
+	"fmt"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
+	"text/template"
 )
 
 type Field struct {
-    Name      string
-    GoName    string
-    ProtoType string
-    SQLType   string
-    JSONName  string
-    IsID      bool
-    IsTS      bool
+	Name      string
+	GoName    string
+	ProtoType string
+	SQLType   string
+	JSONName  string
+	IsID      bool
+	IsTS      bool
 }
 
 type Model struct {
-    Module        string
-    Name          string
-    NameLower     string
-    Table         string
-    Service       string
-    ProtoPackage  string
-    GoPackagePath string
-    GoPkgName     string
-    Fields        []Field
+	Module        string
+	Name          string
+	NameLower     string
+	Table         string
+	Service       string
+	ProtoPackage  string
+	GoPackagePath string
+	GoPkgName     string
+	Fields        []Field
 }
 
 func main() {
-    var name string
-    var fields string
-    flag.StringVar(&name, "name", "", "Entity name in PascalCase, e.g. User")
-    flag.StringVar(&fields, "fields", "", `Fields, e.g. "name:string email:string age:int"`)
-    flag.Parse()
+	var name string
+	var fields string
+	flag.StringVar(&name, "name", "", "Entity name in PascalCase, e.g. User")
+	flag.StringVar(&fields, "fields", "", `Fields, e.g. "name:string email:string age:int"`)
+	flag.Parse()
 
-    if strings.TrimSpace(name) == "" {
-        exitErr(errors.New("-name is required (e.g. -name User)"))
-    }
-    if strings.TrimSpace(fields) == "" {
-        exitErr(errors.New(`-fields is required (e.g. -fields "name:string email:string age:int")`))
-    }
+	if strings.TrimSpace(name) == "" {
+		exitErr(errors.New("-name is required (e.g. -name User)"))
+	}
+	if strings.TrimSpace(fields) == "" {
+		exitErr(errors.New(`-fields is required (e.g. -fields "name:string email:string age:int")`))
+	}
 
-    module, err := readModulePath("go.mod")
-    if err != nil {
-        exitErr(err)
-    }
+	module, err := readModulePath("go.mod")
+	if err != nil {
+		exitErr(err)
+	}
 
-    m, err := buildModel(module, name, fields)
-    if err != nil {
-        exitErr(err)
-    }
+	m, err := buildModel(module, name, fields)
+	if err != nil {
+		exitErr(err)
+	}
 
-    if err := writeFromTemplate("proto", filepath.Join("proto", m.NameLower, "v1", m.NameLower+".proto"), protoTmpl, m); err != nil {
-        exitErr(err)
-    }
-    if err := writeFromTemplate("usecase", filepath.Join("internal", "usecase", m.NameLower+"_usecase.go"), usecaseTmpl, m); err != nil {
-        exitErr(err)
-    }
-    if err := writeFromTemplate("handler", filepath.Join("internal", "adapter", "grpc", m.NameLower+"_handler.go"), handlerTmpl, m); err != nil {
-        exitErr(err)
-    }
-    if err := writeFromTemplate("repo-mem", filepath.Join("internal", "adapter", "repository", "memory", m.NameLower+"_repository.go"), repoMemoryTmpl, m); err != nil {
-        exitErr(err)
-    }
-    if err := writeFromTemplate("repo-mysql", filepath.Join("internal", "adapter", "repository", "mysql", m.NameLower+"_repository.go"), repoMySQLTmpl, m); err != nil {
-        exitErr(err)
-    }
+	if err := writeFromTemplate("proto", filepath.Join("proto", m.NameLower, "v1", m.NameLower+".proto"), protoTmpl, m); err != nil {
+		exitErr(err)
+	}
+	if err := writeFromTemplate("usecase", filepath.Join("internal", "usecase", m.NameLower+"_usecase.go"), usecaseTmpl, m); err != nil {
+		exitErr(err)
+	}
+	if err := writeFromTemplate("handler", filepath.Join("internal", "adapter", "grpc", m.NameLower+"_handler.go"), handlerTmpl, m); err != nil {
+		exitErr(err)
+	}
+	if err := writeFromTemplate("repo-mem", filepath.Join("internal", "adapter", "repository", "memory", m.NameLower+"_repository.go"), repoMemoryTmpl, m); err != nil {
+		exitErr(err)
+	}
+	if err := writeFromTemplate("repo-mysql", filepath.Join("internal", "adapter", "repository", "mysql", m.NameLower+"_repository.go"), repoMySQLTmpl, m); err != nil {
+		exitErr(err)
+	}
 
-    if err := ensureSchemaSQL(filepath.Join("db", "schema.sql"), schemaTmpl, m); err != nil {
-        exitErr(err)
-    }
-    if err := patchServerMain(filepath.Join("cmd", "server", "main.go"), m); err != nil {
-        exitErr(err)
-    }
+	if err := ensureSchemaSQL(filepath.Join("db", "schema.sql"), schemaTmpl, m); err != nil {
+		exitErr(err)
+	}
+	if err := patchServerMain(filepath.Join("cmd", "server", "main.go"), m); err != nil {
+		exitErr(err)
+	}
 
-    fmt.Printf("scaffolded: %s (fields: %d)\n", m.Name, len(m.Fields))
+	fmt.Printf("scaffolded: %s (fields: %d)\n", m.Name, len(m.Fields))
 }
 
 func exitErr(err error) {
-    fmt.Fprintln(os.Stderr, "ERROR:", err)
-    os.Exit(1)
+	fmt.Fprintln(os.Stderr, "ERROR:", err)
+	os.Exit(1)
 }
 
 func readModulePath(goModPath string) (string, error) {
-    b, err := os.ReadFile(goModPath)
-    if err != nil {
-        return "", err
-    }
-    re := regexp.MustCompile(`(?m)^\s*module\s+(\S+)\s*$`)
-    m := re.FindStringSubmatch(string(b))
-    if len(m) != 2 {
-        return "", fmt.Errorf("failed to parse module path from %s", goModPath)
-    }
-    return m[1], nil
+	b, err := os.ReadFile(goModPath)
+	if err != nil {
+		return "", err
+	}
+	re := regexp.MustCompile(`(?m)^\s*module\s+(\S+)\s*$`)
+	m := re.FindStringSubmatch(string(b))
+	if len(m) != 2 {
+		return "", fmt.Errorf("failed to parse module path from %s", goModPath)
+	}
+	return m[1], nil
 }
 
 func buildModel(module, name, fields string) (Model, error) {
-    if !isPascal(name) {
-        return Model{}, fmt.Errorf("name must be PascalCase (e.g. User, BlogPost). got: %q", name)
-    }
-    nl := strings.ToLower(name[:1]) + name[1:]
-    table := pluralizeSnake(toSnake(nl))
+	if !isPascal(name) {
+		return Model{}, fmt.Errorf("name must be PascalCase (e.g. User, BlogPost). got: %q", name)
+	}
+	nl := strings.ToLower(name[:1]) + name[1:]
+	table := pluralizeSnake(toSnake(nl))
 
-    fp, err := parseFields(fields)
-    if err != nil {
-        return Model{}, err
-    }
+	fp, err := parseFields(fields)
+	if err != nil {
+		return Model{}, err
+	}
 
-    m := Model{
-        Module:        module,
-        Name:          name,
-        NameLower:     nl,
-        Table:         table,
-        Service:       name + "Service",
-        ProtoPackage:  toSnake(nl) + ".v1",
-        GoPkgName:     toSnake(nl) + "v1",
-        GoPackagePath: fmt.Sprintf("%s/gen/%s/v1;%sv1", module, toSnake(nl), toSnake(nl)),
-        Fields:        fp,
-    }
-    return m, nil
+	m := Model{
+		Module:        module,
+		Name:          name,
+		NameLower:     nl,
+		Table:         table,
+		Service:       name + "Service",
+		ProtoPackage:  toSnake(nl) + ".v1",
+		GoPkgName:     toSnake(nl) + "v1",
+		GoPackagePath: fmt.Sprintf("%s/gen/%s/v1;%sv1", module, toSnake(nl), toSnake(nl)),
+		Fields:        fp,
+	}
+	return m, nil
 }
 
 func parseFields(s string) ([]Field, error) {
-    parts := strings.Fields(s)
-    if len(parts) == 0 {
-        return nil, errors.New("no fields provided")
-    }
-    var out []Field
-    seen := map[string]bool{}
-    for _, p := range parts {
-        kv := strings.SplitN(p, ":", 2)
-        if len(kv) != 2 {
-            return nil, fmt.Errorf("invalid field spec: %q (expected name:type)", p)
-        }
-        name := strings.TrimSpace(kv[0])
-        typ := strings.TrimSpace(kv[1])
-        if name == "" || typ == "" {
-            return nil, fmt.Errorf("invalid field spec: %q", p)
-        }
-        if !isLowerIdent(name) {
-            return nil, fmt.Errorf("field name must be lower_snake/camel (lower start). got: %q", name)
-        }
-        if seen[name] {
-            return nil, fmt.Errorf("duplicate field: %s", name)
-        }
-        seen[name] = true
+	parts := strings.Fields(s)
+	if len(parts) == 0 {
+		return nil, errors.New("no fields provided")
+	}
+	var out []Field
+	seen := map[string]bool{}
+	for _, p := range parts {
+		kv := strings.SplitN(p, ":", 2)
+		if len(kv) != 2 {
+			return nil, fmt.Errorf("invalid field spec: %q (expected name:type)", p)
+		}
+		name := strings.TrimSpace(kv[0])
+		typ := strings.TrimSpace(kv[1])
+		if name == "" || typ == "" {
+			return nil, fmt.Errorf("invalid field spec: %q", p)
+		}
+		if !isLowerIdent(name) {
+			return nil, fmt.Errorf("field name must be lower_snake/camel (lower start). got: %q", name)
+		}
+		if seen[name] {
+			return nil, fmt.Errorf("duplicate field: %s", name)
+		}
+		seen[name] = true
 
-        protoType, sqlType, err := mapType(typ)
-        if err != nil {
-            return nil, fmt.Errorf("field %s: %w", name, err)
-        }
-        out = append(out, Field{
-            Name:      name,
-            GoName:    toPascal(name),
-            ProtoType: protoType,
-            SQLType:   sqlType,
-            JSONName:  toSnake(name),
-        })
-    }
-    return out, nil
+		protoType, sqlType, err := mapType(typ)
+		if err != nil {
+			return nil, fmt.Errorf("field %s: %w", name, err)
+		}
+		out = append(out, Field{
+			Name:      name,
+			GoName:    toPascal(name),
+			ProtoType: protoType,
+			SQLType:   sqlType,
+			JSONName:  toSnake(name),
+		})
+	}
+	return out, nil
 }
 
 func mapType(t string) (protoType, sqlType string, err error) {
-    switch strings.ToLower(t) {
-    case "string":
-        return "string", "VARCHAR(255)", nil
-    case "text":
-        return "string", "TEXT", nil
-    case "int", "int32":
-        return "int32", "INT", nil
-    case "int64":
-        return "int64", "BIGINT", nil
-    case "bool":
-        return "bool", "TINYINT(1)", nil
-    default:
-        return "", "", fmt.Errorf("unknown type %q (supported: string,text,int,int32,int64,bool)", t)
-    }
+	switch strings.ToLower(t) {
+	case "string":
+		return "string", "VARCHAR(255)", nil
+	case "text":
+		return "string", "TEXT", nil
+	case "int", "int32":
+		return "int32", "INT", nil
+	case "int64":
+		return "int64", "BIGINT", nil
+	case "bool":
+		return "bool", "TINYINT(1)", nil
+	default:
+		return "", "", fmt.Errorf("unknown type %q (supported: string,text,int,int32,int64,bool)", t)
+	}
 }
 
 func writeFromTemplate(label, path, tmpl string, m Model) error {
-    if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-        return err
-    }
-    if _, err := os.Stat(path); err == nil {
-        return fmt.Errorf("%s already exists: %s", label, path)
-    }
-    t, err := template.New(label).Funcs(template.FuncMap{
-        "inc": func(i int) int { return i + 1 },
-        "add2": func(i int) int { return i + 2 },
-    }).Parse(tmpl)
-    if err != nil {
-        return err
-    }
-    var buf bytes.Buffer
-    if err := t.Execute(&buf, m); err != nil {
-        return err
-    }
-    return os.WriteFile(path, buf.Bytes(), 0o644)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	if _, err := os.Stat(path); err == nil {
+		return fmt.Errorf("%s already exists: %s", label, path)
+	}
+	t, err := template.New(label).Funcs(template.FuncMap{
+		"inc":  func(i int) int { return i + 1 },
+		"add2": func(i int) int { return i + 2 },
+	}).Parse(tmpl)
+	if err != nil {
+		return err
+	}
+	var buf bytes.Buffer
+	if err := t.Execute(&buf, m); err != nil {
+		return err
+	}
+	return os.WriteFile(path, buf.Bytes(), 0o644)
 }
 
 func ensureSchemaSQL(path, tmpl string, m Model) error {
-    if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-        return err
-    }
-    b, err := os.ReadFile(path)
-    if err != nil {
-        if os.IsNotExist(err) {
-            if err := os.WriteFile(path, []byte("-- schema.sql\n"), 0o644); err != nil {
-                return err
-            }
-            b = []byte("-- schema.sql\n")
-        } else {
-            return err
-        }
-    }
-    content := string(b)
-    createSig := fmt.Sprintf("CREATE TABLE %s", m.Table)
-    if strings.Contains(content, createSig) {
-        return nil
-    }
-    t, err := template.New("schema").Parse(tmpl)
-    if err != nil {
-        return err
-    }
-    var buf bytes.Buffer
-    if err := t.Execute(&buf, m); err != nil {
-        return err
-    }
-    if !strings.HasSuffix(content, "\n") {
-        content += "\n"
-    }
-    content += "\n" + buf.String() + "\n"
-    return os.WriteFile(path, []byte(content), 0o644)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			if err := os.WriteFile(path, []byte("-- schema.sql\n"), 0o644); err != nil {
+				return err
+			}
+			b = []byte("-- schema.sql\n")
+		} else {
+			return err
+		}
+	}
+	content := string(b)
+	createSig := fmt.Sprintf("CREATE TABLE %s", m.Table)
+	if strings.Contains(content, createSig) {
+		return nil
+	}
+	t, err := template.New("schema").Parse(tmpl)
+	if err != nil {
+		return err
+	}
+	var buf bytes.Buffer
+	if err := t.Execute(&buf, m); err != nil {
+		return err
+	}
+	if !strings.HasSuffix(content, "\n") {
+		content += "\n"
+	}
+	content += "\n" + buf.String() + "\n"
+	return os.WriteFile(path, []byte(content), 0o644)
 }
 
 func patchServerMain(path string, m Model) error {
-    b, err := os.ReadFile(path)
-    if err != nil {
-        return err
-    }
-    s := string(b)
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	s := string(b)
 
-    importMarker := "// scaffold:imports (DO NOT REMOVE)"
-    routeMarker := "// scaffold:routes (DO NOT REMOVE)"
+	importMarker := "// scaffold:imports (DO NOT REMOVE)"
+	routeMarker := "// scaffold:routes (DO NOT REMOVE)"
 
-    importLine := fmt.Sprintf("\t%q\n", fmt.Sprintf("%s/gen/%s/v1/%sv1connect", m.Module, toSnake(m.NameLower), toSnake(m.NameLower)))
-    if strings.Contains(s, importLine) || strings.Contains(s, fmt.Sprintf(`"%s/gen/%s/v1/%sv1connect"`, m.Module, toSnake(m.NameLower), toSnake(m.NameLower))) {
-        // already imported
-    } else {
-        if !strings.Contains(s, importMarker) {
-            return fmt.Errorf("missing import marker in %s: %s", path, importMarker)
-        }
-        s = strings.Replace(s, importMarker, importMarker+"\n"+importLine, 1)
-    }
+	importLine := fmt.Sprintf("\t%q\n", fmt.Sprintf("%s/gen/%s/v1/%sv1connect", m.Module, toSnake(m.NameLower), toSnake(m.NameLower)))
+	if strings.Contains(s, importLine) || strings.Contains(s, fmt.Sprintf(`"%s/gen/%s/v1/%sv1connect"`, m.Module, toSnake(m.NameLower), toSnake(m.NameLower))) {
+		// already imported
+	} else {
+		if !strings.Contains(s, importMarker) {
+			return fmt.Errorf("missing import marker in %s: %s", path, importMarker)
+		}
+		s = strings.Replace(s, importMarker, importMarker+"\n"+importLine, 1)
+	}
 
-    routeSnippet := fmt.Sprintf(`
+	routeSnippet := fmt.Sprintf(`
     // %s scaffold
     %sRepo := memory.New%[1]sRepository()
     %sUC := usecase.New%[1]sUsecase(%sRepo)
@@ -270,57 +270,57 @@ func patchServerMain(path string, m Model) error {
     mux.Handle(%sPath, %sH)
 `, m.Name, toSnake(m.NameLower), toSnake(m.NameLower), toSnake(m.NameLower), toSnake(m.NameLower), toSnake(m.NameLower), toSnake(m.NameLower), toSnake(m.NameLower), toSnake(m.NameLower), toSnake(m.NameLower), toSnake(m.NameLower), toSnake(m.NameLower))
 
-    if strings.Contains(s, fmt.Sprintf("New%sServiceHandler", m.Name)) {
-        // already registered
-    } else {
-        if !strings.Contains(s, routeMarker) {
-            return fmt.Errorf("missing route marker in %s: %s", path, routeMarker)
-        }
-        s = strings.Replace(s, routeMarker, routeMarker+"\n"+routeSnippet, 1)
-    }
+	if strings.Contains(s, fmt.Sprintf("New%sServiceHandler", m.Name)) {
+		// already registered
+	} else {
+		if !strings.Contains(s, routeMarker) {
+			return fmt.Errorf("missing route marker in %s: %s", path, routeMarker)
+		}
+		s = strings.Replace(s, routeMarker, routeMarker+"\n"+routeSnippet, 1)
+	}
 
-    return os.WriteFile(path, []byte(s), 0o644)
+	return os.WriteFile(path, []byte(s), 0o644)
 }
 
 func isPascal(s string) bool {
-    return regexp.MustCompile(`^[A-Z][A-Za-z0-9]*$`).MatchString(s)
+	return regexp.MustCompile(`^[A-Z][A-Za-z0-9]*$`).MatchString(s)
 }
 
 func isLowerIdent(s string) bool {
-    return regexp.MustCompile(`^[a-z][a-zA-Z0-9_]*$`).MatchString(s)
+	return regexp.MustCompile(`^[a-z][a-zA-Z0-9_]*$`).MatchString(s)
 }
 
 func toSnake(s string) string {
-    var out []rune
-    for i, r := range s {
-        if i > 0 && r >= 'A' && r <= 'Z' {
-            out = append(out, '_')
-        }
-        out = append(out, rune(strings.ToLower(string(r))[0]))
-    }
-    return string(out)
+	var out []rune
+	for i, r := range s {
+		if i > 0 && r >= 'A' && r <= 'Z' {
+			out = append(out, '_')
+		}
+		out = append(out, rune(strings.ToLower(string(r))[0]))
+	}
+	return string(out)
 }
 
 func pluralizeSnake(s string) string {
-    if strings.HasSuffix(s, "s") {
-        return s
-    }
-    return s + "s"
+	if strings.HasSuffix(s, "s") {
+		return s
+	}
+	return s + "s"
 }
 
 func toPascal(s string) string {
-    parts := strings.Split(toSnake(s), "_")
-    var b strings.Builder
-    for _, p := range parts {
-        if p == "" {
-            continue
-        }
-        b.WriteString(strings.ToUpper(p[:1]))
-        if len(p) > 1 {
-            b.WriteString(p[1:])
-        }
-    }
-    return b.String()
+	parts := strings.Split(toSnake(s), "_")
+	var b strings.Builder
+	for _, p := range parts {
+		if p == "" {
+			continue
+		}
+		b.WriteString(strings.ToUpper(p[:1]))
+		if len(p) > 1 {
+			b.WriteString(p[1:])
+		}
+	}
+	return b.String()
 }
 
 const protoTmpl = `syntax = "proto3";
@@ -444,7 +444,7 @@ func (h *{{.Name}}Handler) Create{{.Name}}(
         return nil, connect.NewError(connect.CodeInternal, err)
     }
     res := connect.NewResponse(&{{.GoPkgName}}.Create{{.Name}}Response{
-        {{.NameLower}}: toProto{{.Name}}(out),
+        {{.Name}}: toProto{{.Name}}(out),
     })
     return res, nil
 }
@@ -457,7 +457,7 @@ func (h *{{.Name}}Handler) Get{{.Name}}(
     if err != nil {
         return nil, connect.NewError(connect.CodeInternal, err)
     }
-    return connect.NewResponse(&{{.GoPkgName}}.Get{{.Name}}Response{ {{.NameLower}}: toProto{{.Name}}(out) }), nil
+    return connect.NewResponse(&{{.GoPkgName}}.Get{{.Name}}Response{ {{.Name}}: toProto{{.Name}}(out) }), nil
 }
 
 func (h *{{.Name}}Handler) List{{.Name}}s(
@@ -472,7 +472,7 @@ func (h *{{.Name}}Handler) List{{.Name}}s(
     for _, it := range items {
         out = append(out, toProto{{.Name}}(it))
     }
-    return connect.NewResponse(&{{.GoPkgName}}.List{{.Name}}sResponse{ {{.NameLower}}s: out }), nil
+    return connect.NewResponse(&{{.GoPkgName}}.List{{.Name}}sResponse{ {{.Name}}s: out }), nil
 }
 
 func (h *{{.Name}}Handler) Update{{.Name}}(
@@ -489,7 +489,7 @@ func (h *{{.Name}}Handler) Update{{.Name}}(
     if err != nil {
         return nil, connect.NewError(connect.CodeInternal, err)
     }
-    return connect.NewResponse(&{{.GoPkgName}}.Update{{.Name}}Response{ {{.NameLower}}: toProto{{.Name}}(out) }), nil
+    return connect.NewResponse(&{{.GoPkgName}}.Update{{.Name}}Response{ {{.Name}}: toProto{{.Name}}(out) }), nil
 }
 
 func (h *{{.Name}}Handler) Delete{{.Name}}(
