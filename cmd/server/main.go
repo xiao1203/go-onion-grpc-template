@@ -1,26 +1,16 @@
 package main
 
 import (
-	"fmt"
-	"log"
-	"net/http"
+    "fmt"
+    "log"
+    "net/http"
 
-	"github.com/xiao1203/go-onion-grpc-template/gen/greeter/v1/greeterv1connect"
-	grpcadapter "github.com/xiao1203/go-onion-grpc-template/internal/adapter/grpc"
-	"github.com/xiao1203/go-onion-grpc-template/internal/adapter/repository/memory"
-	inframysql "github.com/xiao1203/go-onion-grpc-template/internal/infra/mysql"
-	"github.com/xiao1203/go-onion-grpc-template/internal/usecase"
+    grpcadapter "github.com/xiao1203/go-onion-grpc-template/internal/adapter/grpc"
+    inframysql "github.com/xiao1203/go-onion-grpc-template/internal/infra/mysql"
 )
 
 func main() {
-	// DI（後で wire に置き換えてもOK）
-	repo := memory.NewGreeterRepository()
-	uc := usecase.NewGreeterUsecase(repo)
-	handler := grpcadapter.NewGreeterHandler(uc)
-
-	mux := http.NewServeMux()
-	path, h := greeterv1connect.NewGreeterServiceHandler(handler)
-	mux.Handle(path, h)
+    mux := http.NewServeMux()
 
 	// Registry-based DI: open shared DB (GORM) and register all generated routes
 	db, err := inframysql.OpenGormFromEnv("")
