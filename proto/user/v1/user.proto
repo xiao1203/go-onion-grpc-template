@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package user.v1;
+
+option go_package = "github.com/xiao1203/go-onion-grpc-template/gen/user/v1;userv1";
+
+message Empty {}
+
+message User {
+  uint64 id = 1;
+  string email = 2;
+  string display_name = 3;
+  string picture_url = 4;
+  repeated string roles = 5;
+}
+
+// -------- User (self) --------
+message GetMeRequest {}
+message GetMeResponse { User user = 1; }
+
+message UpdateMyProfileRequest {
+  string display_name = 1;
+  string picture_url = 2;
+}
+message UpdateMyProfileResponse { User user = 1; }
+
+service UserService {
+  rpc GetMe(GetMeRequest) returns (GetMeResponse) {}
+  rpc UpdateMyProfile(UpdateMyProfileRequest) returns (UpdateMyProfileResponse) {}
+}
+

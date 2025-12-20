@@ -22,6 +22,17 @@ services:
       TEST_DB_USER: app
       TEST_DB_PASS: apppass
       TEST_DB_NAME: app_test
+      # auth (development defaults)
+      DEV_AUTH_BYPASS: "1"
+      DEV_USER_ID: "1"
+      # For HS256 local testing, uncomment and set a secret
+      # AUTH_HS256_SECRET: devsecret
+      # For OIDC (JWKS), set these values instead of HS256
+      # AUTH_JWKS_URL: ""
+      # AUTH_ISSUER: ""
+      # AUTH_AUDIENCE: ""
+      # AUTH_JWKS_TTL: "5m"
+      # AUTH_CLOCK_SKEW: "60s"
     ports:
       - "8080:8080"
     depends_on:

@@ -1,16 +1,16 @@
 package main
 
 import (
-    "fmt"
-    "log"
-    "net/http"
+	"fmt"
+	"log"
+	"net/http"
 
-    grpcadapter "github.com/xiao1203/go-onion-grpc-template/internal/adapter/grpc"
-    inframysql "github.com/xiao1203/go-onion-grpc-template/internal/infra/mysql"
+	grpcadapter "github.com/xiao1203/go-onion-grpc-template/internal/adapter/grpc"
+	inframysql "github.com/xiao1203/go-onion-grpc-template/internal/infra/mysql"
 )
 
 func main() {
-    mux := http.NewServeMux()
+	mux := http.NewServeMux()
 
 	// Registry-based DI: open shared DB (GORM) and register all generated routes
 	db, err := inframysql.OpenGormFromEnv("")

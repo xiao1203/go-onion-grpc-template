@@ -2,7 +2,7 @@
         protogen proto scaffold scaffold-all clear \
         migrate migrate-dev migrate-test \
         dry-run dry-run-dev dry-run-test \
-        reset-test-db
+        reset-test-db reset-dev-db
 
 up:
 	docker compose up -d --build
@@ -178,3 +178,9 @@ reset-test-db:
 	docker compose rm -sf mysql_test
 	docker compose up -d mysql_test
 	$(MAKE) migrate-test
+
+# 開発DB(app_dev)を完全リセット（状態が怪しい時の復旧用）
+reset-dev-db:
+	docker compose rm -sf mysql_dev
+	docker compose up -d mysql_dev
+	$(MAKE) migrate-dev
