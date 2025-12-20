@@ -3,6 +3,9 @@
 Go 言語で **オニオンアーキテクチャ + gRPC（connect-go）** を採用した  
 **フル Docker 開発環境付きテンプレート**です。
 
+<img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/f93129b5-568f-404b-8ef7-418eb46bb465" />
+
+
 このテンプレートは、1コマンドで CRUD の gRPC API を雛形生成し、
 マイグレーションと疎通確認（HTTPリクエスト）まで実行できます。
 
