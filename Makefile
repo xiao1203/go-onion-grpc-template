@@ -1,5 +1,5 @@
-.PHONY: up down logs sh test \
-        generate scaffold scaffold-all clear \
+.PHONY: up down logs sh test restart \
+        protogen proto scaffold scaffold-all clear \
         migrate migrate-dev migrate-test \
         dry-run dry-run-dev dry-run-test \
         reset-test-db
@@ -16,12 +16,18 @@ logs:
 sh:
 	docker compose exec api bash
 
+restart:
+	docker compose restart api
+
 test:
 	docker compose exec api ./scripts/test.sh
 
 # ---- buf (proto -> gen) ----
-generate:
+protogen:
 	docker compose run --rm -T buf generate
+
+# alias: more discoverable for proto-only codegen
+proto: protogen
 
 # ---- scaffold ----
 # 例: make scaffold name=User fields="name:string email:string age:int"
@@ -32,7 +38,7 @@ scaffold:
 			exit 1; \
 		fi
 		go run ./cmd/scaffold -name "$(SC_NAME)" -fields "$(strip $(fields))" $(if $(mem),-with-memory,)
-		$(MAKE) generate
+		$(MAKE) protogen
 		go fmt ./...
 
 # 生成物クリーンアップ（同名エンティティを作り直す場合に使用）

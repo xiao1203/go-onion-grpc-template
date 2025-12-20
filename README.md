@@ -74,7 +74,7 @@ make scaffold-clean name=User
 - proto→Go/Connect 生成のみ手動で実行
 
 ```
-make generate
+make protogen
 ```
 
 補足
@@ -252,28 +252,47 @@ tmpfs 使用（永続化しない） / ホストポート: `23306`
 connect-go を使用  
 proto 定義は `proto/` 配下  
 buf 設定（`buf.yaml` / `buf.gen.yaml`）を同梱  
-`make generate` で protoc/プラグインのローカル導入なしにコード生成可能  
+`make protogen` で protoc/プラグインのローカル導入なしにコード生成可能  
 
 ルーティング登録はレジストリ方式です。`cmd/server/main.go` は以下のみ行います。
 
-    - MySQL接続の初期化（1回、GORM使用: `internal/infra/mysql.OpenGormFromEnv`）
-- `grpcadapter.RegisterAll(mux, grpcadapter.Deps{MySQL: db})` の呼び出し
+- MySQL接続の初期化（1回、GORM使用: `internal/infra/mysql.OpenGormFromEnv`）
+- `grpcadapter.RegisterAll(mux, grpcadapter.Deps{Gorm: db})` の呼び出し
 
 各エンティティは `internal/adapter/grpc/<entity>_routes.go` に registrar が生成され、`init()` でレジストリへ登録されます。
 このため、`main.go` を手で編集する必要はありません（scaffold/clear による編集も不要）。
+
+### 手動でAPIを作る（scaffoldを使わない場合）
+
+最小手順は以下です。
+
+1. Protoを追加: `proto/<entity>/v1/<entity>.proto`
+   - `option go_package = "<your-module>/gen/<entity>/v1;<entity>v1"` を忘れずに設定
+2. 生成: `make protogen`（`make proto` でも可）
+3. Usecase実装: `internal/usecase/<entity>_usecase.go`
+4. Repository実装（GORM）: `internal/adapter/repository/mysql/<entity>_repository.go`
+5. Handler実装: `internal/adapter/grpc/<entity>_handler.go`
+6. ルート登録: `internal/adapter/grpc/<entity>_routes.go`（initでレジストリにAdd）
+7. DDL追加: `db/schema.sql` にCREATE TABLEを追記
+8. マイグレーション: `make migrate`
+9. 再起動: `make restart`
+10. 疎通: curl で `/<pkg>.<ver>.<Service>/<Method>` をPOST
+
+scaffoldはこの手順を自動化しています。手作業で進めたい場合は上記を参考にしてください。
 
 ### よくあるコマンドまとめ
 ```
 make up
 make down
 make logs
+make restart
 make sh
 make test
 make scaffold name=Article fields="name:string content:string"
 make scaffold-all name=Article fields="name:string content:string"
 make scaffold-clean name=Article
 make clear Article [drop=1]  # 生成物とschemaの該当ブロックを削除。drop=1でDBにDROP適用
-make generate
+make protogen
 make dry-run [DROP_FLAGS="--enable-drop"]
 make migrate [DROP_FLAGS="--enable-drop"]
 ```
@@ -291,3 +310,9 @@ make migrate [DROP_FLAGS="--enable-drop"]
 
 ### 将来の拡張ポイント
 GitHub Actions（CI）  
+
+---
+
+## 変更履歴
+
+タグ/バージョンごとの詳細は CHANGELOG.md を参照してください。
