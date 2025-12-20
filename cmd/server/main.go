@@ -10,7 +10,7 @@ import (
 	"github.com/xiao1203/go-onion-grpc-template/internal/adapter/repository/memory"
 	"github.com/xiao1203/go-onion-grpc-template/internal/usecase"
 
-		// scaffold:imports (DO NOT REMOVE)
+	// scaffold:imports (DO NOT REMOVE)
 )
 
 func main() {
@@ -24,7 +24,6 @@ func main() {
 	mux.Handle(path, h)
 
 	// scaffold:routes (DO NOT REMOVE)
-
 
 
 	addr := ":8080"

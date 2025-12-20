@@ -18,6 +18,7 @@ type Field struct {
 	ProtoType string
 	SQLType   string
 	JSONName  string
+	DBName    string
 	IsID      bool
 	IsTS      bool
 }
@@ -157,12 +158,18 @@ func parseFields(s string) ([]Field, error) {
 		if err != nil {
 			return nil, fmt.Errorf("field %s: %w", name, err)
 		}
+		dbname := toSnake(name)
+		switch dbname { // minimum reserved handling
+		case "text", "order", "group":
+			dbname = dbname + "_col"
+		}
 		out = append(out, Field{
 			Name:      name,
 			GoName:    toPascal(name),
 			ProtoType: protoType,
 			SQLType:   sqlType,
 			JSONName:  toSnake(name),
+			DBName:    dbname,
 		})
 	}
 	return out, nil
@@ -251,24 +258,40 @@ func patchServerMain(path string, m Model) error {
 	importMarker := "// scaffold:imports (DO NOT REMOVE)"
 	routeMarker := "// scaffold:routes (DO NOT REMOVE)"
 
-	importLine := fmt.Sprintf("\t%q\n", fmt.Sprintf("%s/gen/%s/v1/%sv1connect", m.Module, toSnake(m.NameLower), toSnake(m.NameLower)))
-	if strings.Contains(s, importLine) || strings.Contains(s, fmt.Sprintf(`"%s/gen/%s/v1/%sv1connect"`, m.Module, toSnake(m.NameLower), toSnake(m.NameLower))) {
-		// already imported
-	} else {
+	// 1) connect import
+	connectImport := fmt.Sprintf("\t%q\n", fmt.Sprintf("%s/gen/%s/v1/%sv1connect", m.Module, toSnake(m.NameLower), toSnake(m.NameLower)))
+	if !strings.Contains(s, connectImport) {
 		if !strings.Contains(s, importMarker) {
 			return fmt.Errorf("missing import marker in %s: %s", path, importMarker)
 		}
-		s = strings.Replace(s, importMarker, importMarker+"\n"+importLine, 1)
+		s = strings.Replace(s, importMarker, importMarker+"\n"+connectImport, 1)
+	}
+	// 2) mysql repo + infra imports (with alias)
+	mysqlRepoImport := fmt.Sprintf("\tmysqlrepo \"%s/internal/adapter/repository/mysql\"\n", m.Module)
+	if !strings.Contains(s, "mysqlrepo \"") {
+		s = strings.Replace(s, importMarker, importMarker+"\n"+mysqlRepoImport, 1)
+	}
+	infraImport := fmt.Sprintf("\tinframysql \"%s/internal/infra/mysql\"\n", m.Module)
+	if !strings.Contains(s, "inframysql \"") {
+		s = strings.Replace(s, importMarker, importMarker+"\n"+infraImport, 1)
 	}
 
+	// DI + route registration snippet (MySQL repo default)
 	routeSnippet := fmt.Sprintf(`
-    // %s scaffold
-    %sRepo := memory.New%[1]sRepository()
+    // %s scaffold (MySQL repo)
+    %sDB, %sErr := inframysql.OpenFromEnv("")
+    if %sErr != nil {
+        log.Fatalf("db open: %%v", %sErr)
+    }
+    defer %sDB.Close()
+    %sRepo := mysqlrepo.New%[1]sRepository(%sDB)
     %sUC := usecase.New%[1]sUsecase(%sRepo)
     %sHandler := grpcadapter.New%[1]sHandler(%sUC)
     %sPath, %sH := %sv1connect.New%[1]sServiceHandler(%sHandler)
     mux.Handle(%sPath, %sH)
-`, m.Name, toSnake(m.NameLower), toSnake(m.NameLower), toSnake(m.NameLower), toSnake(m.NameLower), toSnake(m.NameLower), toSnake(m.NameLower), toSnake(m.NameLower), toSnake(m.NameLower), toSnake(m.NameLower), toSnake(m.NameLower), toSnake(m.NameLower))
+`, m.Name,
+		toSnake(m.NameLower), toSnake(m.NameLower), toSnake(m.NameLower), toSnake(m.NameLower),
+		toSnake(m.NameLower), toSnake(m.NameLower), toSnake(m.NameLower), toSnake(m.NameLower), toSnake(m.NameLower), toSnake(m.NameLower), toSnake(m.NameLower))
 
 	if strings.Contains(s, fmt.Sprintf("New%sServiceHandler", m.Name)) {
 		// already registered
@@ -589,31 +612,105 @@ const repoMySQLTmpl = `package mysql
 
 import (
     "context"
+    "database/sql"
     "errors"
-
-    "{{.Module}}/internal/usecase"
 )
 
-type {{.Name}}Repository struct{}
+import "{{.Module}}/internal/usecase"
 
-func New{{.Name}}Repository() *{{.Name}}Repository { return &{{.Name}}Repository{} }
+type {{.Name}}Repository struct{ db *sql.DB }
 
-var errNotImplemented = errors.New("mysql repository not implemented yet")
+func New{{.Name}}Repository(db *sql.DB) *{{.Name}}Repository { return &{{.Name}}Repository{db: db} }
+
+var ErrNotFound = errors.New("{{.NameLower}} not found")
 
 func (r *{{.Name}}Repository) Create(ctx context.Context, in *usecase.{{.Name}}) (*usecase.{{.Name}}, error) {
-    return nil, errNotImplemented
+    const q = "INSERT INTO " + string('\x60') + "{{.Table}}" + string('\x60') + " (\n"+
+{{- range .Fields }}        "  " + string('\x60') + "{{.DBName}}" + string('\x60') + ",\n"+
+{{- end }}        "  created_at, updated_at\n) VALUES (\n"+
+{{- range .Fields }}        "  ?,\n"+
+{{- end }}        "  NOW(6), NOW(6)\n)"
+    res, err := r.db.ExecContext(ctx, q,
+{{- range .Fields }}        in.{{.GoName}},
+{{- end }}    )
+    if err != nil {
+        return nil, err
+    }
+    id, err := res.LastInsertId()
+    if err != nil {
+        return nil, err
+    }
+    out := *in
+    out.ID = id
+    return &out, nil
 }
+
 func (r *{{.Name}}Repository) Get(ctx context.Context, id int64) (*usecase.{{.Name}}, error) {
-    return nil, errNotImplemented
+    const q = "SELECT id,\n"+
+{{- range .Fields }}        "  " + string('\x60') + "{{.DBName}}" + string('\x60') + ",\n"+
+{{- end }}        "  created_at, updated_at\nFROM " + string('\x60') + "{{.Table}}" + string('\x60') + " WHERE id = ? LIMIT 1"
+    var a usecase.{{.Name}}
+    err := r.db.QueryRowContext(ctx, q, id).Scan(
+        &a.ID,
+{{- range .Fields }}        &a.{{.GoName}},
+{{- end }}    new(interface{}), new(interface{}),
+    )
+    if errors.Is(err, sql.ErrNoRows) {
+        return nil, nil
+    }
+    if err != nil {
+        return nil, err
+    }
+    return &a, nil
 }
+
 func (r *{{.Name}}Repository) List(ctx context.Context) ([]*usecase.{{.Name}}, error) {
-    return nil, errNotImplemented
+    const q = "SELECT id,\n"+
+{{- range .Fields }}        "  " + string('\x60') + "{{.DBName}}" + string('\x60') + ",\n"+
+{{- end }}        "  created_at, updated_at\nFROM " + string('\x60') + "{{.Table}}" + string('\x60') + " ORDER BY id DESC"
+    rows, err := r.db.QueryContext(ctx, q)
+    if err != nil {
+        return nil, err
+    }
+    defer rows.Close()
+    var out []*usecase.{{.Name}}
+    for rows.Next() {
+        var a usecase.{{.Name}}
+        var createdAt, updatedAt interface{}
+        if err := rows.Scan(
+            &a.ID,
+{{- range .Fields }}            &a.{{.GoName}},
+{{- end }}            &createdAt, &updatedAt,
+        ); err != nil {
+            return nil, err
+        }
+        cp := a
+        out = append(out, &cp)
+    }
+    if err := rows.Err(); err != nil {
+        return nil, err
+    }
+    return out, nil
 }
+
 func (r *{{.Name}}Repository) Update(ctx context.Context, in *usecase.{{.Name}}) (*usecase.{{.Name}}, error) {
-    return nil, errNotImplemented
+    const q = "UPDATE " + string('\x60') + "{{.Table}}" + string('\x60') + " SET\n"+
+{{- range .Fields }}        "  " + string('\x60') + "{{.DBName}}" + string('\x60') + " = ?,\n"+
+{{- end }}        "  updated_at = NOW(6)\nWHERE id = ?"
+    _, err := r.db.ExecContext(ctx, q,
+{{- range .Fields }}        in.{{.GoName}},
+{{- end }}        in.ID,
+    )
+    if err != nil {
+        return nil, err
+    }
+    return r.Get(ctx, in.ID)
 }
+
 func (r *{{.Name}}Repository) Delete(ctx context.Context, id int64) error {
-    return errNotImplemented
+    const q = "DELETE FROM " + string('\x60') + "{{.Table}}" + string('\x60') + " WHERE id = ?"
+    _, err := r.db.ExecContext(ctx, q, id)
+    return err
 }
 `
 
@@ -621,7 +718,7 @@ const schemaTmpl = `-- {{.Name}} table
 CREATE TABLE {{.Table}} (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
 {{- range .Fields }}
-  {{.JSONName}} {{.SQLType}} NOT NULL,
+  {{.DBName}} {{.SQLType}} NOT NULL,
 {{- end }}
   created_at DATETIME(6) NOT NULL,
   updated_at DATETIME(6) NOT NULL,

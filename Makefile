@@ -1,5 +1,5 @@
 .PHONY: up down logs sh test \
-        generate scaffold scaffold-all \
+        generate scaffold scaffold-all clear \
         migrate migrate-dev migrate-test \
         dry-run dry-run-dev dry-run-test \
         reset-test-db
@@ -41,6 +41,48 @@ scaffold-clean:
 	  internal/adapter/repository/memory/$${snake}_repository.go \
 	  internal/adapter/repository/mysql/$${snake}_repository.go || true
 
+# ---- clear (make clear <Name>) ----
+# 例: make clear Article
+# 第二引数（エンティティ名）を拾って scaffold-clean を呼び出します
+CLEAR_NAME := $(word 2,$(MAKECMDGOALS))
+clear:
+	@if [ -z "$(CLEAR_NAME)" ]; then \
+		echo "Usage: make clear <Name>"; exit 1; \
+	fi
+	@echo "[clear] removing generated files for: $(CLEAR_NAME)"
+	@$(MAKE) -s scaffold-clean name="$(CLEAR_NAME)"
+	@echo "[clear] pruning db/schema.sql entries for: $(CLEAR_NAME)"
+	@name='$(CLEAR_NAME)'; \
+	# CamelCase -> snake_case
+	snake=$$(printf "%s" $$name | sed -E "s/([A-Z])/_\1/g" | sed -E "s/^_//" | tr "[:upper:]" "[:lower:]"); \
+		table=$$snake; [ "$${table##*s}" = "" ] || table=$${table}s; \
+		tmp=$$(mktemp); \
+		sed -E -e "/^--[[:space:]]*$$name[[:space:]]+table/,/\) ENGINE=.*;/d" \
+		       -e "/^CREATE[[:space:]]+TABLE[[:space:]]+`?$$table`?[[:space:]]*\(/,/\) ENGINE=.*;/d" \
+		  db/schema.sql > $$tmp && mv $$tmp db/schema.sql && echo "[clear] db/schema.sql updated" || true
+	@echo "[clear] pruning cmd/server/main.go entries for: $(CLEAR_NAME)"
+	@mod=$$(sed -n 's/^module \(.*\)$/\1/p' go.mod); \
+	name='$(CLEAR_NAME)'; snake=$$(printf "%s" $$name | sed -E "s/([A-Z])/_\1/g" | sed -E "s/^_//" | tr "[:upper:]" "[:lower:]"); \
+	imp_line="\"$$mod/gen/$$snake/v1/$$snakev1connect\""; \
+	# remove import line and route block starting with "// Name scaffold"
+	tmp=$$(mktemp); \
+	awk -v IMP=$$imp_line 'BEGIN{inimp=0} { if ($$0 ~ IMP) next; print }' cmd/server/main.go | \
+	awk -v NAME="$(CLEAR_NAME)" 'BEGIN{drop=0} { if ($$0 ~ "^//[[:space:]]*" NAME "[[:space:]]+scaffold") {drop=1; next} if (drop) { if ($$0 ~ /^$/) drop=0; next } print }' > $$tmp \
+	&& mv $$tmp cmd/server/main.go && echo "[clear] server routes cleaned" || true
+	@if [ "$(drop)" = "1" ]; then \
+	  echo "[clear] applying DROP via mysqldef (--enable-drop)"; \
+	  $(MAKE) -s migrate DROP_FLAGS="--enable-drop"; \
+	else \
+	  echo "[clear] (tip) run: make migrate DROP_FLAGS=\"--enable-drop\""; \
+	fi
+
+# 余分なゴール（例: Article）を無視してエラーにしないためのダミーターゲット
+ifneq ($(CLEAR_NAME),)
+.PHONY: $(CLEAR_NAME)
+$(CLEAR_NAME):
+	@:
+endif
+
 # フルセット: 起動 -> scaffold -> 生成 -> マイグレーション -> コマンド例出力
 scaffold-all:
 	$(MAKE) up
@@ -77,7 +119,7 @@ scaffold-all:
 	service=$${name}Service; \
 	base=$${snake}.v1.$${service}; \
 	echo "curl -sS -X POST -H 'Content-Type: application/json' --data '{\"id\":1}' http://127.0.0.1:8080/$$base/Get$$name"; \
-	echo "curl -sS -X POST -H 'Content-Type: application/json' --data '{}' http://127.0.0.1:8080/$$base/List$$name\"s"
+		echo "curl -sS -X POST -H 'Content-Type: application/json' --data '{}' http://127.0.0.1:8080/$$base/List$${name}s"
 
 
 # ---- sqldef / mysqldef ----

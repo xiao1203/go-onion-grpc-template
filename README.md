@@ -74,8 +74,8 @@ make generate
 ```
 
 補足
-- 生成直後の配線は memory repository です（DBなしで起動可）。
-- MySQL 実装に切り替える場合は `internal/adapter/repository/mysql` を実装して DI に差し替えます。
+- 生成直後の配線は MySQL repository です（DBに永続化）。
+- メモリ実装で試したい場合は `internal/adapter/repository/memory` を使うよう DI を切り替えてください。
 
 ---
 
@@ -200,7 +200,9 @@ mysql_test を使用（毎回クリーン） / CI 実行を想定
 make migrate
 ```
 
-- 破壊的変更（DROP など）も許可して適用
+- 破壊的変更（DROP など）も許可して適用  
+mysqldef は安全運用のため、DROP を伴う破壊的変更をデフォルトでは実行しません。  
+そのため、DROP を伴う変更を schema.sql に加えた場合は、以下のように `DROP_FLAGS="--enable-drop"` を指定して実行してください。
 
 ```
 make dry-run DROP_FLAGS="--enable-drop"   # まず差分確認
