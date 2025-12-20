@@ -27,13 +27,13 @@ generate:
 # 例: make scaffold name=User fields="name:string email:string age:int"
 SC_NAME := $(if $(strip $(name)),$(strip $(name)),$(word 2,$(MAKECMDGOALS)))
 scaffold:
-	@if [ -z "$(strip $(SC_NAME))" ] || [ -z "$(strip $(fields))" ]; then \
-		echo "Usage: make scaffold name=Entity fields=\"k1:t1 k2:t2 ...\""; \
-		exit 1; \
-	fi
-	go run ./cmd/scaffold -name "$(SC_NAME)" -fields "$(strip $(fields))"
-	$(MAKE) generate
-	go fmt ./...
+		@if [ -z "$(strip $(SC_NAME))" ] || [ -z "$(strip $(fields))" ]; then \
+			echo "Usage: make scaffold name=Entity fields=\"k1:t1 k2:t2 ...\""; \
+			exit 1; \
+		fi
+		go run ./cmd/scaffold -name "$(SC_NAME)" -fields "$(strip $(fields))" $(if $(mem),-with-memory,)
+		$(MAKE) generate
+		go fmt ./...
 
 # 生成物クリーンアップ（同名エンティティを作り直す場合に使用）
 # 例: make scaffold-clean name=Article

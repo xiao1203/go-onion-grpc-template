@@ -76,7 +76,9 @@ make generate
 補足
 - 生成直後の配線は MySQL repository です（DBに永続化）。
 - ルーティング登録はレジストリ方式です。scaffold は `internal/adapter/grpc/<entity>_routes.go` を生成し、`init()` で登録します（`main.go` は編集しません）。
-- メモリ実装で試したい場合は、生成された `internal/adapter/grpc/<entity>_routes.go` のレポジトリ組み立てを memory 実装に差し替えてください。
+- メモリ実装はオプションです。必要な場合のみ以下のいずれかで生成してください。
+  - `make scaffold name=User fields="..." mem=1`
+  - もしくは `go run ./cmd/scaffold -name User -fields "..." -with-memory`
 
 ---
 

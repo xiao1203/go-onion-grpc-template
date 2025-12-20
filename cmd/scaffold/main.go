@@ -38,8 +38,10 @@ type Model struct {
 func main() {
 	var name string
 	var fields string
+	var withMemory bool
 	flag.StringVar(&name, "name", "", "Entity name in PascalCase, e.g. User")
 	flag.StringVar(&fields, "fields", "", `Fields, e.g. "name:string email:string age:int"`)
+	flag.BoolVar(&withMemory, "with-memory", false, "also generate in-memory repository implementation")
 	flag.Parse()
 
 	if strings.TrimSpace(name) == "" {
@@ -68,8 +70,10 @@ func main() {
 	if err := writeFromTemplate("handler", filepath.Join("internal", "adapter", "grpc", m.NameLower+"_handler.go"), handlerTmpl, m); err != nil {
 		exitErr(err)
 	}
-	if err := writeFromTemplate("repo-mem", filepath.Join("internal", "adapter", "repository", "memory", m.NameLower+"_repository.go"), repoMemoryTmpl, m); err != nil {
-		exitErr(err)
+	if withMemory {
+		if err := writeFromTemplate("repo-mem", filepath.Join("internal", "adapter", "repository", "memory", m.NameLower+"_repository.go"), repoMemoryTmpl, m); err != nil {
+			exitErr(err)
+		}
 	}
 	if err := writeFromTemplate("repo-mysql", filepath.Join("internal", "adapter", "repository", "mysql", m.NameLower+"_repository.go"), repoMySQLTmpl, m); err != nil {
 		exitErr(err)
