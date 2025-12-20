@@ -290,8 +290,4 @@ make migrate [DROP_FLAGS="--enable-drop"]
   - DBにDROPを適用する場合は `make clear <Name> drop=1`（内部で `mysqldef --enable-drop` を実行）
 
 ### 将来の拡張ポイント
-ent（ORM）  
-sqldef（DDL 管理）  
-buf による proto 自動生成（導入済み）  
-wire による DI  
 GitHub Actions（CI）  
