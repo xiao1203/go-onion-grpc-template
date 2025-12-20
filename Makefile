@@ -1,4 +1,5 @@
 .PHONY: up down logs sh test \
+        generate scaffold \
         migrate migrate-dev migrate-test \
         dry-run dry-run-dev dry-run-test \
         reset-test-db
@@ -17,6 +18,17 @@ sh:
 
 test:
 	docker compose exec api ./scripts/test.sh
+
+# ---- buf (proto -> gen) ----
+generate:
+	docker compose run --rm -T buf generate
+
+# ---- scaffold ----
+# 例: make scaffold name=User fields="name:string email:string age:int"
+scaffold:
+	go run ./cmd/scaffold -name "$(name)" -fields "$(fields)"
+	$(MAKE) generate
+	go fmt ./...
 
 # ---- sqldef / mysqldef ----
 DB_USER ?= app

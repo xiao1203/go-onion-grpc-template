@@ -30,6 +30,12 @@ services:
       mysql_test:
         condition: service_healthy
 
+  buf:
+    image: bufbuild/buf:latest
+    working_dir: /work
+    volumes:
+      - ./:/work
+
   mysql_dev:
     image: mysql:8.4
     container_name: mysql_dev
