@@ -44,6 +44,7 @@ curl -sS -X POST -H 'Content-Type: application/json' \
   - domain / usecase / adapter を明確に分離
 - 🔌 gRPC（connect-go）
   - HTTP/2 + Unary RPC
+- 🧰 ORM: GORM（MySQL）
 - 🐳 フル Docker 環境
   - Go API サーバー
   - MySQL 開発 DB
@@ -252,7 +253,7 @@ buf 設定（`buf.yaml` / `buf.gen.yaml`）を同梱
 
 ルーティング登録はレジストリ方式です。`cmd/server/main.go` は以下のみ行います。
 
-- MySQL接続の初期化（1回）
+    - MySQL接続の初期化（1回、GORM使用: `internal/infra/mysql.OpenGormFromEnv`）
 - `grpcadapter.RegisterAll(mux, grpcadapter.Deps{MySQL: db})` の呼び出し
 
 各エンティティは `internal/adapter/grpc/<entity>_routes.go` に registrar が生成され、`init()` でレジストリへ登録されます。

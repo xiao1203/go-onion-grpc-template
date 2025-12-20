@@ -501,7 +501,7 @@ import (
 func init() { Add(register{{.Name}}) }
 
 func register{{.Name}}(mux *http.ServeMux, deps Deps) {
-    repo := mysqlrepo.New{{.Name}}Repository(deps.MySQL)
+    repo := mysqlrepo.New{{.Name}}Repository(deps.Gorm)
     uc := usecase.New{{.Name}}Usecase(repo)
     h := New{{.Name}}Handler(uc)
     path, handler := {{.GoPkgName}}connect.New{{.Name}}ServiceHandler(h)
@@ -583,105 +583,92 @@ const repoMySQLTmpl = `package mysql
 
 import (
     "context"
-    "database/sql"
     "errors"
+    "time"
+
+    "gorm.io/gorm"
+
+    "{{.Module}}/internal/usecase"
 )
 
-import "{{.Module}}/internal/usecase"
+type {{.Name}}Model struct {
+    ID int64 ` + "`gorm:\"primaryKey;autoIncrement\"`" + `
+{{- range .Fields }}
+    {{.GoName}} {{if eq .ProtoType "int32"}}int32{{else if eq .ProtoType "int64"}}int64{{else if eq .ProtoType "bool"}}bool{{else}}string{{end}} ` + "`gorm:\"column:{{.DBName}};not null\"`" + `
+{{- end }}
+    CreatedAt time.Time ` + "`gorm:\"column:created_at;autoCreateTime\"`" + `
+    UpdatedAt time.Time ` + "`gorm:\"column:updated_at;autoUpdateTime\"`" + `
+}
 
-type {{.Name}}Repository struct{ db *sql.DB }
+func ({{.Name}}Model) TableName() string { return "{{.Table}}" }
 
-func New{{.Name}}Repository(db *sql.DB) *{{.Name}}Repository { return &{{.Name}}Repository{db: db} }
+type {{.Name}}Repository struct{ db *gorm.DB }
 
-var ErrNotFound = errors.New("{{.NameLower}} not found")
+func New{{.Name}}Repository(db *gorm.DB) *{{.Name}}Repository { return &{{.Name}}Repository{db: db} }
 
 func (r *{{.Name}}Repository) Create(ctx context.Context, in *usecase.{{.Name}}) (*usecase.{{.Name}}, error) {
-    const q = "INSERT INTO " + string('\x60') + "{{.Table}}" + string('\x60') + " (\n"+
-{{- range .Fields }}        "  " + string('\x60') + "{{.DBName}}" + string('\x60') + ",\n"+
-{{- end }}        "  created_at, updated_at\n) VALUES (\n"+
-{{- range .Fields }}        "  ?,\n"+
-{{- end }}        "  NOW(6), NOW(6)\n)"
-    res, err := r.db.ExecContext(ctx, q,
-{{- range .Fields }}        in.{{.GoName}},
-{{- end }}    )
-    if err != nil {
-        return nil, err
+    m := {{.Name}}Model{
+{{- range .Fields }}
+        {{.GoName}}: in.{{.GoName}},
+{{- end }}
     }
-    id, err := res.LastInsertId()
-    if err != nil {
+    if err := r.db.WithContext(ctx).Create(&m).Error; err != nil {
         return nil, err
     }
     out := *in
-    out.ID = id
+    out.ID = m.ID
     return &out, nil
 }
 
 func (r *{{.Name}}Repository) Get(ctx context.Context, id int64) (*usecase.{{.Name}}, error) {
-    const q = "SELECT id,\n"+
-{{- range .Fields }}        "  " + string('\x60') + "{{.DBName}}" + string('\x60') + ",\n"+
-{{- end }}        "  created_at, updated_at\nFROM " + string('\x60') + "{{.Table}}" + string('\x60') + " WHERE id = ? LIMIT 1"
-    var a usecase.{{.Name}}
-    err := r.db.QueryRowContext(ctx, q, id).Scan(
-        &a.ID,
-{{- range .Fields }}        &a.{{.GoName}},
-{{- end }}    new(interface{}), new(interface{}),
-    )
-    if errors.Is(err, sql.ErrNoRows) {
-        return nil, nil
-    }
-    if err != nil {
+    var m {{.Name}}Model
+    if err := r.db.WithContext(ctx).First(&m, id).Error; err != nil {
+        if errors.Is(err, gorm.ErrRecordNotFound) {
+            return nil, nil
+        }
         return nil, err
     }
-    return &a, nil
+    return &usecase.{{.Name}}{
+        ID: m.ID,
+{{- range .Fields }}
+        {{.GoName}}: m.{{.GoName}},
+{{- end }}
+    }, nil
 }
 
 func (r *{{.Name}}Repository) List(ctx context.Context) ([]*usecase.{{.Name}}, error) {
-    const q = "SELECT id,\n"+
-{{- range .Fields }}        "  " + string('\x60') + "{{.DBName}}" + string('\x60') + ",\n"+
-{{- end }}        "  created_at, updated_at\nFROM " + string('\x60') + "{{.Table}}" + string('\x60') + " ORDER BY id DESC"
-    rows, err := r.db.QueryContext(ctx, q)
-    if err != nil {
+    var rows []{{.Name}}Model
+    if err := r.db.WithContext(ctx).Order("id DESC").Find(&rows).Error; err != nil {
         return nil, err
     }
-    defer rows.Close()
-    var out []*usecase.{{.Name}}
-    for rows.Next() {
-        var a usecase.{{.Name}}
-        var createdAt, updatedAt interface{}
-        if err := rows.Scan(
-            &a.ID,
-{{- range .Fields }}            &a.{{.GoName}},
-{{- end }}            &createdAt, &updatedAt,
-        ); err != nil {
-            return nil, err
+    out := make([]*usecase.{{.Name}}, 0, len(rows))
+    for _, m := range rows {
+        it := usecase.{{.Name}}{
+            ID: m.ID,
+{{- range .Fields }}
+            {{.GoName}}: m.{{.GoName}},
+{{- end }}
         }
-        cp := a
-        out = append(out, &cp)
-    }
-    if err := rows.Err(); err != nil {
-        return nil, err
+        out = append(out, &it)
     }
     return out, nil
 }
 
 func (r *{{.Name}}Repository) Update(ctx context.Context, in *usecase.{{.Name}}) (*usecase.{{.Name}}, error) {
-    const q = "UPDATE " + string('\x60') + "{{.Table}}" + string('\x60') + " SET\n"+
-{{- range .Fields }}        "  " + string('\x60') + "{{.DBName}}" + string('\x60') + " = ?,\n"+
-{{- end }}        "  updated_at = NOW(6)\nWHERE id = ?"
-    _, err := r.db.ExecContext(ctx, q,
-{{- range .Fields }}        in.{{.GoName}},
-{{- end }}        in.ID,
-    )
-    if err != nil {
+    updates := map[string]interface{}{
+{{- range .Fields }}
+        "{{.DBName}}": in.{{.GoName}},
+{{- end }}
+        "updated_at": time.Now(),
+    }
+    if err := r.db.WithContext(ctx).Model(&{{.Name}}Model{}).Where("id = ?", in.ID).Updates(updates).Error; err != nil {
         return nil, err
     }
     return r.Get(ctx, in.ID)
 }
 
 func (r *{{.Name}}Repository) Delete(ctx context.Context, id int64) error {
-    const q = "DELETE FROM " + string('\x60') + "{{.Table}}" + string('\x60') + " WHERE id = ?"
-    _, err := r.db.ExecContext(ctx, q, id)
-    return err
+    return r.db.WithContext(ctx).Delete(&{{.Name}}Model{}, id).Error
 }
 `
 

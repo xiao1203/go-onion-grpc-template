@@ -3,11 +3,17 @@ package grpc
 import (
 	"database/sql"
 	"net/http"
+
+	"gorm.io/gorm"
 )
 
 // Deps holds shared dependencies used by service registrars.
+// Note: prefer Gorm when using MySQL repositories implemented with GORM.
 type Deps struct {
+	// Deprecated: kept for legacy code that still expects *sql.DB.
 	MySQL *sql.DB
+	// Preferred ORM handle for MySQL-backed repositories.
+	Gorm *gorm.DB
 }
 
 // Registrar registers handlers onto the mux using provided deps.
