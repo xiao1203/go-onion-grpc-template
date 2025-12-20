@@ -39,12 +39,13 @@ scaffold:
 # 例: make scaffold-clean name=Article
 scaffold-clean:
 	@name='$(name)'; \
-	snake=$$(printf "%s" $$name | sed -E 's/([A-Z])/_\1/g' | sed -E 's/^_//' | tr '[:upper:]' '[:lower:]'); \
-	rm -rf proto/$$snake gen/$$snake \
-	  internal/usecase/$${snake}_usecase.go \
-	  internal/adapter/grpc/$${snake}_handler.go \
-	  internal/adapter/repository/memory/$${snake}_repository.go \
-	  internal/adapter/repository/mysql/$${snake}_repository.go || true
+    snake=$$(printf "%s" $$name | sed -E 's/([A-Z])/_\1/g' | sed -E 's/^_//' | tr '[:upper:]' '[:lower:]'); \
+    rm -rf proto/$$snake gen/$$snake \
+      internal/usecase/$${snake}_usecase.go \
+      internal/adapter/grpc/$${snake}_handler.go \
+      internal/adapter/grpc/$${snake}_routes.go \
+      internal/adapter/repository/memory/$${snake}_repository.go \
+      internal/adapter/repository/mysql/$${snake}_repository.go || true
 
 # ---- clear (make clear <Name>) ----
 # 例: make clear Article
@@ -56,32 +57,22 @@ clear:
 	fi
 	@echo "[clear] removing generated files for: $(CLEAR_NAME)"
 	@$(MAKE) -s scaffold-clean name="$(CLEAR_NAME)"
-	@echo "[clear] pruning db/schema.sql entries for: $(CLEAR_NAME)"
+		@echo "[clear] pruning db/schema.sql entries for: $(CLEAR_NAME)"
 		@name='$(CLEAR_NAME)'; \
 		# CamelCase -> snake_case
 		snake=$$(printf "%s" $$name | sed -E 's/([A-Z])/_\1/g' | sed -E 's/^_//' | tr '[:upper:]' '[:lower:]'); \
-			table=$$snake; [ "$${table##*s}" = "" ] || table=$${table}s; \
-			tmp=$$(mktemp); \
-				# 1) drop only the header marker line (do not span multiple lines)
-				awk -v NM="$$name" '!( $$0 ~ "^--[[:space:]]*" NM "[[:space:]]+table[[:space:]]*$$" )' db/schema.sql | \
-			awk -v TBL="$$table" 'BEGIN{drop=0} { if ($$0 ~ "^CREATE[[:space:]]+TABLE[[:space:]]+`?" TBL "`?[[:space:]]*\(") {drop=1; next} if (drop) { if ($$0 ~ /\) ENGINE=/) {drop=0; next} next } print }' > $$tmp \
-			&& mv $$tmp db/schema.sql && echo "[clear] db/schema.sql updated" || true
-	@echo "[clear] pruning cmd/server/main.go entries for: $(CLEAR_NAME)"
-	@name='$(CLEAR_NAME)'; snake=$$(printf "%s" $$name | sed -E "s/([A-Z])/_\1/g" | sed -E "s/^_//" | tr "[:upper:]" "[:lower:]"); \
-	# 1) remove connect import for the entity
-	sed -E -e "/gen\/$$snake\/v1\/.*v1connect/d" -i'' cmd/server/main.go 2>/dev/null || true; \
-	# 2) remove route block starting with "// Name scaffold" until blank line
-	tmp=$$(mktemp); \
-		awk -v NAME="$(CLEAR_NAME)" 'BEGIN{drop=0} { if ($$0 ~ "^//[[:space:]]*" NAME "[[:space:]]+scaffold") {drop=1; next} if (drop) { if ($$0 ~ /^$$/) {drop=0; next} next } print }' cmd/server/main.go > $$tmp \
-	&& mv $$tmp cmd/server/main.go && echo "[clear] server routes cleaned" || true; \
-	# 3) drop infra imports if alias not used
-	if ! grep -q "mysqlrepo\." cmd/server/main.go 2>/dev/null; then \
-	  sed -E -e "/internal\/adapter\/repository\/mysql/d" -i'' cmd/server/main.go 2>/dev/null || true; \
-	fi; \
-	if ! grep -q "inframysql\." cmd/server/main.go 2>/dev/null; then \
-	  sed -E -e "/internal\/infra\/mysql/d" -i'' cmd/server/main.go 2>/dev/null || true; \
-	fi; \
-	go fmt cmd/server/main.go >/dev/null 2>&1 || true
+		table=$$snake; [ "$${table##*s}" = "" ] || table=$${table}s; \
+		tmp=$$(mktemp); \
+		# 1) remove header marker and matching CREATE TABLE block in one pass \
+		awk -v NM="$$name" -v TBL="$$table" 'BEGIN{drop=0} \
+		  ($$0 ~ "^--[[:space:]]*" NM "[[:space:]]+table[[:space:]]*$$") {next} \
+		  ($$0 ~ "^CREATE[[:space:]]+TABLE[[:space:]]+`?" TBL "`?[[:space:]]*\\(") {drop=1; next} \
+		  (drop && $$0 ~ /\) ENGINE=/) {drop=0; next} \
+		  drop {next} \
+		  {print} \
+		' db/schema.sql > "$$tmp" \
+		&& mv "$$tmp" db/schema.sql && echo "[clear] db/schema.sql updated" || true
+		@echo "[clear] (no main.go edits needed; registry-based routes)"
 	@if [ "$(drop)" = "1" ]; then \
 	  echo "[clear] applying DROP via mysqldef (--enable-drop)"; \
 	  $(MAKE) -s migrate DROP_FLAGS="--enable-drop"; \

@@ -23,7 +23,7 @@ make scaffold-all name=Article fields="name:string content:string"
 ```
 
 実行内容（自動）
-- proto/handler/usecase/repository(memory)/schema.sql 生成
+- proto/handler/usecase/repository(mysql)/routes/schema.sql を生成
 - buf generate によるコード生成（gen 配下）
 - mysqldef で dev/test DB へ適用
 - API 再起動 → curl（内蔵の curler サービス）で Create/Get/List を叩いて疎通確認
@@ -75,7 +75,8 @@ make generate
 
 補足
 - 生成直後の配線は MySQL repository です（DBに永続化）。
-- メモリ実装で試したい場合は `internal/adapter/repository/memory` を使うよう DI を切り替えてください。
+- ルーティング登録はレジストリ方式です。scaffold は `internal/adapter/grpc/<entity>_routes.go` を生成し、`init()` で登録します（`main.go` は編集しません）。
+- メモリ実装で試したい場合は、生成された `internal/adapter/grpc/<entity>_routes.go` のレポジトリ組み立てを memory 実装に差し替えてください。
 
 ---
 
@@ -89,9 +90,11 @@ make generate
 │ ├── domain/ # ドメインモデル
 │ ├── usecase/ # ユースケース
 │ └── adapter/
-│ ├── grpc/ # gRPC / connect ハンドラ
-│ └── repository/ # 外部依存
-│ └── memory/ # 仮実装（後で DB に差し替え）
+│   ├── grpc/ # gRPC / connect ハンドラ + ルート登録（registry）
+│   │   ├── registry.go # レジストリ本体（Add / RegisterAll）
+│   │   └── <entity>_{handler|routes}.go # scaffold 生成
+│   └── repository/ # 外部依存
+│       └── memory/ # 仮実装（後で DB に差し替え）
 ├── proto/ # gRPC 定義
 ├── gen/ # buf generate の生成コード
 ├── docker/ # DB 初期化用（任意）
@@ -238,12 +241,20 @@ tmpfs 使用（永続化しない） / ホストポート: `23306`
 `curlimages/curl` ベースの使い捨てコンテナ。`scaffold-all` 実行時に API へ HTTP POST を自動送信します。
 
 --------------
-### gRPC について
+### gRPC / ルーティングについて
 
 connect-go を使用  
 proto 定義は `proto/` 配下  
 buf 設定（`buf.yaml` / `buf.gen.yaml`）を同梱  
 `make generate` で protoc/プラグインのローカル導入なしにコード生成可能  
+
+ルーティング登録はレジストリ方式です。`cmd/server/main.go` は以下のみ行います。
+
+- MySQL接続の初期化（1回）
+- `grpcadapter.RegisterAll(mux, grpcadapter.Deps{MySQL: db})` の呼び出し
+
+各エンティティは `internal/adapter/grpc/<entity>_routes.go` に registrar が生成され、`init()` でレジストリへ登録されます。
+このため、`main.go` を手で編集する必要はありません（scaffold/clear による編集も不要）。
 
 ### よくあるコマンドまとめ
 ```
@@ -255,10 +266,22 @@ make test
 make scaffold name=Article fields="name:string content:string"
 make scaffold-all name=Article fields="name:string content:string"
 make scaffold-clean name=Article
+make clear Article [drop=1]  # 生成物とschemaの該当ブロックを削除。drop=1でDBにDROP適用
 make generate
 make dry-run [DROP_FLAGS="--enable-drop"]
 make migrate [DROP_FLAGS="--enable-drop"]
 ```
+
+### clear の動作（レジストリ方式）
+- 削除対象
+  - `proto/<entity>` / `gen/<entity>`
+  - `internal/usecase/<entity>_usecase.go`
+  - `internal/adapter/grpc/<entity>_{handler,routes}.go`
+  - `internal/adapter/repository/{memory,mysql}/<entity>_repository.go`
+  - `db/schema.sql` の対象テーブルの CREATE TABLE ブロックと見出しコメント
+- 備考
+  - `main.go` は編集しません（レジストリ方式のため不要）
+  - DBにDROPを適用する場合は `make clear <Name> drop=1`（内部で `mysqldef --enable-drop` を実行）
 
 ### 将来の拡張ポイント
 ent（ORM）  

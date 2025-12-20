@@ -78,7 +78,8 @@ func main() {
 	if err := ensureSchemaSQL(filepath.Join("db", "schema.sql"), schemaTmpl, m); err != nil {
 		exitErr(err)
 	}
-	if err := patchServerMain(filepath.Join("cmd", "server", "main.go"), m); err != nil {
+	// add per-entity route registrar (registry-based; main.go stays unchanged)
+	if err := writeFromTemplate("routes", filepath.Join("internal", "adapter", "grpc", m.NameLower+"_routes.go"), routesTmpl, m); err != nil {
 		exitErr(err)
 	}
 
@@ -248,62 +249,7 @@ func ensureSchemaSQL(path, tmpl string, m Model) error {
 	return os.WriteFile(path, []byte(content), 0o644)
 }
 
-func patchServerMain(path string, m Model) error {
-	b, err := os.ReadFile(path)
-	if err != nil {
-		return err
-	}
-	s := string(b)
-
-	importMarker := "// scaffold:imports (DO NOT REMOVE)"
-	routeMarker := "// scaffold:routes (DO NOT REMOVE)"
-
-	// 1) connect import
-	connectImport := fmt.Sprintf("\t%q\n", fmt.Sprintf("%s/gen/%s/v1/%sv1connect", m.Module, toSnake(m.NameLower), toSnake(m.NameLower)))
-	if !strings.Contains(s, connectImport) {
-		if !strings.Contains(s, importMarker) {
-			return fmt.Errorf("missing import marker in %s: %s", path, importMarker)
-		}
-		s = strings.Replace(s, importMarker, importMarker+"\n"+connectImport, 1)
-	}
-	// 2) mysql repo + infra imports (with alias)
-	mysqlRepoImport := fmt.Sprintf("\tmysqlrepo \"%s/internal/adapter/repository/mysql\"\n", m.Module)
-	if !strings.Contains(s, "mysqlrepo \"") {
-		s = strings.Replace(s, importMarker, importMarker+"\n"+mysqlRepoImport, 1)
-	}
-	infraImport := fmt.Sprintf("\tinframysql \"%s/internal/infra/mysql\"\n", m.Module)
-	if !strings.Contains(s, "inframysql \"") {
-		s = strings.Replace(s, importMarker, importMarker+"\n"+infraImport, 1)
-	}
-
-	// DI + route registration snippet (MySQL repo default)
-	routeSnippet := fmt.Sprintf(`
-    // %s scaffold (MySQL repo)
-    %sDB, %sErr := inframysql.OpenFromEnv("")
-    if %sErr != nil {
-        log.Fatalf("db open: %%v", %sErr)
-    }
-    defer %sDB.Close()
-    %sRepo := mysqlrepo.New%[1]sRepository(%sDB)
-    %sUC := usecase.New%[1]sUsecase(%sRepo)
-    %sHandler := grpcadapter.New%[1]sHandler(%sUC)
-    %sPath, %sH := %sv1connect.New%[1]sServiceHandler(%sHandler)
-    mux.Handle(%sPath, %sH)
-`, m.Name,
-		toSnake(m.NameLower), toSnake(m.NameLower), toSnake(m.NameLower), toSnake(m.NameLower),
-		toSnake(m.NameLower), toSnake(m.NameLower), toSnake(m.NameLower), toSnake(m.NameLower), toSnake(m.NameLower), toSnake(m.NameLower), toSnake(m.NameLower))
-
-	if strings.Contains(s, fmt.Sprintf("New%sServiceHandler", m.Name)) {
-		// already registered
-	} else {
-		if !strings.Contains(s, routeMarker) {
-			return fmt.Errorf("missing route marker in %s: %s", path, routeMarker)
-		}
-		s = strings.Replace(s, routeMarker, routeMarker+"\n"+routeSnippet, 1)
-	}
-
-	return os.WriteFile(path, []byte(s), 0o644)
-}
+// legacy patchServerMain removed in favor of registry-based routes
 
 func isPascal(s string) bool {
 	return regexp.MustCompile(`^[A-Z][A-Za-z0-9]*$`).MatchString(s)
@@ -535,6 +481,27 @@ func toProto{{.Name}}(in *usecase.{{.Name}}) *{{.GoPkgName}}.{{.Name}} {
         {{.GoName}}: in.{{.GoName}},
 {{- end }}
     }
+}
+`
+
+const routesTmpl = `package grpc
+
+import (
+    "net/http"
+
+    {{.GoPkgName}}connect "{{.Module}}/gen/{{.NameLower}}/v1/{{.NameLower}}v1connect"
+    mysqlrepo "{{.Module}}/internal/adapter/repository/mysql"
+    "{{.Module}}/internal/usecase"
+)
+
+func init() { Add(register{{.Name}}) }
+
+func register{{.Name}}(mux *http.ServeMux, deps Deps) {
+    repo := mysqlrepo.New{{.Name}}Repository(deps.MySQL)
+    uc := usecase.New{{.Name}}Usecase(repo)
+    h := New{{.Name}}Handler(uc)
+    path, handler := {{.GoPkgName}}connect.New{{.Name}}ServiceHandler(h)
+    mux.Handle(path, handler)
 }
 `
 
