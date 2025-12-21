@@ -6,7 +6,7 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/xiao1203/go-onion-grpc-template/internal/usecase"
+	"github.com/xiao1203/go-onion-grpc-template/internal/domain"
 )
 
 type UserModel struct {
@@ -37,7 +37,7 @@ type UserRepository struct{ db *gorm.DB }
 
 func NewUserRepository(db *gorm.DB) *UserRepository { return &UserRepository{db: db} }
 
-func (r *UserRepository) FindByID(ctx context.Context, id int64) (*usecase.User, error) {
+func (r *UserRepository) FindByID(ctx context.Context, id int64) (*domain.User, error) {
 	var u UserModel
 	if err := r.db.WithContext(ctx).First(&u, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -49,7 +49,7 @@ func (r *UserRepository) FindByID(ctx context.Context, id int64) (*usecase.User,
 	if err != nil {
 		return nil, err
 	}
-	return &usecase.User{
+	return &domain.User{
 		ID:          u.ID,
 		Email:       u.Email,
 		DisplayName: u.DisplayName,
@@ -58,7 +58,7 @@ func (r *UserRepository) FindByID(ctx context.Context, id int64) (*usecase.User,
 	}, nil
 }
 
-func (r *UserRepository) UpdateProfile(ctx context.Context, id int64, displayName, pictureURL string) (*usecase.User, error) {
+func (r *UserRepository) UpdateProfile(ctx context.Context, id int64, displayName, pictureURL string) (*domain.User, error) {
 	if err := r.db.WithContext(ctx).Model(&UserModel{}).Where("id = ?", id).Updates(map[string]any{
 		"display_name": displayName,
 		"picture_url":  pictureURL,

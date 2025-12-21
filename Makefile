@@ -47,6 +47,7 @@ scaffold-clean:
 	@name='$(name)'; \
     snake=$$(printf "%s" $$name | sed -E 's/([A-Z])/_\1/g' | sed -E 's/^_//' | tr '[:upper:]' '[:lower:]'); \
     rm -rf proto/$$snake gen/$$snake \
+      internal/domain/$${snake}.go \
       internal/usecase/$${snake}_usecase.go \
       internal/adapter/grpc/$${snake}_handler.go \
       internal/adapter/grpc/$${snake}_routes.go \
@@ -100,7 +101,7 @@ scaffold-all:
 	$(MAKE) migrate
 	# 再起動して最新コードを反映
 	docker compose restart api
-	sleep 1
+	sleep 3
 	@echo ""
 	@echo "[疎通確認を実行]" && \
 	name='$(SC_NAME)'; fields='$(strip $(fields))'; \

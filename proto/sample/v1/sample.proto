@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package sample.v1;
+
+option go_package = "github.com/xiao1203/go-onion-grpc-template/gen/sample/v1;samplev1";
+
+service SampleService {
+  rpc CreateSample(CreateSampleRequest) returns (CreateSampleResponse) {}
+  rpc GetSample(GetSampleRequest) returns (GetSampleResponse) {}
+  rpc ListSamples(ListSamplesRequest) returns (ListSamplesResponse) {}
+  rpc UpdateSample(UpdateSampleRequest) returns (UpdateSampleResponse) {}
+  rpc DeleteSample(DeleteSampleRequest) returns (DeleteSampleResponse) {}
+}
+
+message Sample {
+  int64 id = 1;
+  string name = 2;
+  string content = 3;
+  uint32 count = 4;
+}
+message CreateSampleRequest {
+  string name = 1;
+  string content = 2;
+  uint32 count = 3;
+}
+message CreateSampleResponse { Sample sample = 1; }
+
+message GetSampleRequest { int64 id = 1; }
+message GetSampleResponse { Sample sample = 1; }
+
+message ListSamplesRequest {}
+message ListSamplesResponse { repeated Sample samples = 1; }
+
+message UpdateSampleRequest {
+  int64 id = 1;
+  string name = 2;
+  string content = 3;
+  uint32 count = 4;
+}
+message UpdateSampleResponse { Sample sample = 1; }
+
+message DeleteSampleRequest { int64 id = 1; }
+message DeleteSampleResponse {}

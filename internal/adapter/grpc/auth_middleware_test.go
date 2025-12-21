@@ -64,11 +64,11 @@ func TestAuth_HS256_OK(t *testing.T) {
 }
 
 func TestAuth_MissingAuth_Unauthenticated(t *testing.T) {
-    t.Setenv("DEV_AUTH_BYPASS", "")
-    t.Setenv("AUTH_HS256_SECRET", "")
-    t.Setenv("AUTH_JWKS_URL", "")
-    _, err := runThrough(t, nil)
-    if connect.CodeOf(err) != connect.CodeUnauthenticated {
-        t.Fatalf("want Unauthenticated, got %v", connect.CodeOf(err))
-    }
+	t.Setenv("DEV_AUTH_BYPASS", "")
+	t.Setenv("AUTH_HS256_SECRET", "")
+	t.Setenv("AUTH_JWKS_URL", "")
+	_, err := runThrough(t, nil)
+	if connect.CodeOf(err) != connect.CodeUnauthenticated {
+		t.Fatalf("want Unauthenticated, got %v", connect.CodeOf(err))
+	}
 }

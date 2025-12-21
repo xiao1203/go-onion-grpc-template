@@ -13,6 +13,13 @@ require (
 )
 
 require (
+	github.com/goccy/go-yaml v1.18.0 // indirect
+	golang.org/x/sync v0.17.0 // indirect
+)
+
+require (
+	github.com/go-testfixtures/testfixtures/v3 v3.19.0
+	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
 )

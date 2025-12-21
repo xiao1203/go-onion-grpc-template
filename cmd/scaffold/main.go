@@ -64,6 +64,10 @@ func main() {
 	if err := writeFromTemplate("proto", filepath.Join("proto", m.NameLower, "v1", m.NameLower+".proto"), protoTmpl, m); err != nil {
 		exitErr(err)
 	}
+	// domain entity
+	if err := writeFromTemplate("domain", filepath.Join("internal", "domain", m.NameLower+".go"), domainTmpl, m); err != nil {
+		exitErr(err)
+	}
 	if err := writeFromTemplate("usecase", filepath.Join("internal", "usecase", m.NameLower+"_usecase.go"), usecaseTmpl, m); err != nil {
 		exitErr(err)
 	}
@@ -164,9 +168,10 @@ func parseFields(s string) ([]Field, error) {
 			return nil, fmt.Errorf("field %s: %w", name, err)
 		}
 		dbname := toSnake(name)
-		switch dbname { // minimum reserved handling
-		case "text", "order", "group":
-			dbname = dbname + "_col"
+		// Disallow reserved SQL identifiers to avoid invalid DDL
+		switch dbname {
+		case "text", "order", "group", "value":
+			return nil, fmt.Errorf("field %s: %q is a reserved SQL identifier; choose a different name (e.g., %s_col)", name, dbname, dbname)
 		}
 		out = append(out, Field{
 			Name:      name,
@@ -188,12 +193,20 @@ func mapType(t string) (protoType, sqlType string, err error) {
 		return "string", "TEXT", nil
 	case "int", "int32":
 		return "int32", "INT", nil
+	case "int8":
+		return "int32", "TINYINT", nil
 	case "int64":
 		return "int64", "BIGINT", nil
+	case "uint8":
+		return "uint32", "TINYINT UNSIGNED", nil
+	case "uint32":
+		return "uint32", "INT UNSIGNED", nil
+	case "uint64":
+		return "uint64", "BIGINT UNSIGNED", nil
 	case "bool":
 		return "bool", "TINYINT(1)", nil
 	default:
-		return "", "", fmt.Errorf("unknown type %q (supported: string,text,int,int32,int64,bool)", t)
+		return "", "", fmt.Errorf("unknown type %q (supported: string,text,int,int8,int32,int64,uint8,uint32,uint64,bool)", t)
 	}
 }
 
@@ -341,22 +354,28 @@ message Delete{{.Name}}Request { int64 id = 1; }
 message Delete{{.Name}}Response {}
 `
 
-const usecaseTmpl = `package usecase
-
-import "context"
+const domainTmpl = `package domain
 
 type {{.Name}} struct {
     ID int64
 {{- range .Fields }}
-    {{.GoName}} {{if eq .ProtoType "int32"}}int32{{else if eq .ProtoType "int64"}}int64{{else if eq .ProtoType "bool"}}bool{{else}}string{{end}}
+    {{.GoName}} {{if eq .ProtoType "int32"}}int32{{else if eq .ProtoType "int64"}}int64{{else if eq .ProtoType "uint32"}}uint32{{else if eq .ProtoType "uint64"}}uint64{{else if eq .ProtoType "bool"}}bool{{else}}string{{end}}
 {{- end }}
 }
+`
+
+const usecaseTmpl = `package usecase
+
+import (
+    "context"
+    "{{.Module}}/internal/domain"
+)
 
 type {{.Name}}Repository interface {
-    Create(ctx context.Context, in *{{.Name}}) (*{{.Name}}, error)
-    Get(ctx context.Context, id int64) (*{{.Name}}, error)
-    List(ctx context.Context) ([]*{{.Name}}, error)
-    Update(ctx context.Context, in *{{.Name}}) (*{{.Name}}, error)
+    Create(ctx context.Context, in *domain.{{.Name}}) (*domain.{{.Name}}, error)
+    Get(ctx context.Context, id int64) (*domain.{{.Name}}, error)
+    List(ctx context.Context, p domain.ListParams) ([]*domain.{{.Name}}, error)
+    Update(ctx context.Context, in *domain.{{.Name}}) (*domain.{{.Name}}, error)
     Delete(ctx context.Context, id int64) error
 }
 
@@ -368,16 +387,16 @@ func New{{.Name}}Usecase(repo {{.Name}}Repository) *{{.Name}}Usecase {
     return &{{.Name}}Usecase{repo: repo}
 }
 
-func (u *{{.Name}}Usecase) Create(ctx context.Context, in *{{.Name}}) (*{{.Name}}, error) {
+func (u *{{.Name}}Usecase) Create(ctx context.Context, in *domain.{{.Name}}) (*domain.{{.Name}}, error) {
     return u.repo.Create(ctx, in)
 }
-func (u *{{.Name}}Usecase) Get(ctx context.Context, id int64) (*{{.Name}}, error) {
+func (u *{{.Name}}Usecase) Get(ctx context.Context, id int64) (*domain.{{.Name}}, error) {
     return u.repo.Get(ctx, id)
 }
-func (u *{{.Name}}Usecase) List(ctx context.Context) ([]*{{.Name}}, error) {
-    return u.repo.List(ctx)
+func (u *{{.Name}}Usecase) List(ctx context.Context, p domain.ListParams) ([]*domain.{{.Name}}, error) {
+    return u.repo.List(ctx, p)
 }
-func (u *{{.Name}}Usecase) Update(ctx context.Context, in *{{.Name}}) (*{{.Name}}, error) {
+func (u *{{.Name}}Usecase) Update(ctx context.Context, in *domain.{{.Name}}) (*domain.{{.Name}}, error) {
     return u.repo.Update(ctx, in)
 }
 func (u *{{.Name}}Usecase) Delete(ctx context.Context, id int64) error {
@@ -392,6 +411,7 @@ import (
 
     "connectrpc.com/connect"
     {{.GoPkgName}} "{{.Module}}/gen/{{.NameLower}}/v1"
+    "{{.Module}}/internal/domain"
     "{{.Module}}/internal/usecase"
 )
 
@@ -407,7 +427,7 @@ func (h *{{.Name}}Handler) Create{{.Name}}(
     ctx context.Context,
     req *connect.Request[{{.GoPkgName}}.Create{{.Name}}Request],
 ) (*connect.Response[{{.GoPkgName}}.Create{{.Name}}Response], error) {
-    in := &usecase.{{.Name}}{
+    in := &domain.{{.Name}}{
 {{- range .Fields }}
         {{.GoName}}: req.Msg.Get{{.GoName}}(),
 {{- end }}
@@ -437,7 +457,7 @@ func (h *{{.Name}}Handler) List{{.Name}}s(
     ctx context.Context,
     req *connect.Request[{{.GoPkgName}}.List{{.Name}}sRequest],
 ) (*connect.Response[{{.GoPkgName}}.List{{.Name}}sResponse], error) {
-    items, err := h.uc.List(ctx)
+    items, err := h.uc.List(ctx, domain.ListParams{})
     if err != nil {
         return nil, connect.NewError(connect.CodeInternal, err)
     }
@@ -452,7 +472,7 @@ func (h *{{.Name}}Handler) Update{{.Name}}(
     ctx context.Context,
     req *connect.Request[{{.GoPkgName}}.Update{{.Name}}Request],
 ) (*connect.Response[{{.GoPkgName}}.Update{{.Name}}Response], error) {
-    in := &usecase.{{.Name}}{
+    in := &domain.{{.Name}}{
         ID: req.Msg.GetId(),
 {{- range .Fields }}
         {{.GoName}}: req.Msg.Get{{.GoName}}(),
@@ -475,7 +495,7 @@ func (h *{{.Name}}Handler) Delete{{.Name}}(
     return connect.NewResponse(&{{.GoPkgName}}.Delete{{.Name}}Response{}), nil
 }
 
-func toProto{{.Name}}(in *usecase.{{.Name}}) *{{.GoPkgName}}.{{.Name}} {
+func toProto{{.Name}}(in *domain.{{.Name}}) *{{.GoPkgName}}.{{.Name}} {
     if in == nil {
         return nil
     }
@@ -515,20 +535,20 @@ import (
     "context"
     "sync"
 
-    "{{.Module}}/internal/usecase"
+    "{{.Module}}/internal/domain"
 )
 
 type {{.Name}}Repository struct {
     mu   sync.Mutex
     seq  int64
-    data map[int64]*usecase.{{.Name}}
+    data map[int64]*domain.{{.Name}}
 }
 
 func New{{.Name}}Repository() *{{.Name}}Repository {
-    return &{{.Name}}Repository{data: map[int64]*usecase.{{.Name}}{}}
+    return &{{.Name}}Repository{data: map[int64]*domain.{{.Name}}{}}
 }
 
-func (r *{{.Name}}Repository) Create(ctx context.Context, in *usecase.{{.Name}}) (*usecase.{{.Name}}, error) {
+func (r *{{.Name}}Repository) Create(ctx context.Context, in *domain.{{.Name}}) (*domain.{{.Name}}, error) {
     r.mu.Lock()
     defer r.mu.Unlock()
     r.seq++
@@ -538,7 +558,7 @@ func (r *{{.Name}}Repository) Create(ctx context.Context, in *usecase.{{.Name}})
     return &cp, nil
 }
 
-func (r *{{.Name}}Repository) Get(ctx context.Context, id int64) (*usecase.{{.Name}}, error) {
+func (r *{{.Name}}Repository) Get(ctx context.Context, id int64) (*domain.{{.Name}}, error) {
     r.mu.Lock()
     defer r.mu.Unlock()
     v, ok := r.data[id]
@@ -549,18 +569,22 @@ func (r *{{.Name}}Repository) Get(ctx context.Context, id int64) (*usecase.{{.Na
     return &cp, nil
 }
 
-func (r *{{.Name}}Repository) List(ctx context.Context) ([]*usecase.{{.Name}}, error) {
+func (r *{{.Name}}Repository) List(ctx context.Context, p domain.ListParams) ([]*domain.{{.Name}}, error) {
     r.mu.Lock()
     defer r.mu.Unlock()
-    out := make([]*usecase.{{.Name}}, 0, len(r.data))
-    for _, v := range r.data {
-        cp := *v
-        out = append(out, &cp)
-    }
+    tmp := make([]*domain.{{.Name}}, 0, len(r.data))
+    for _, v := range r.data { cp := *v; tmp = append(tmp, &cp) }
+    p = p.Sanitize()
+    start := p.Offset
+    if start > len(tmp) { start = len(tmp) }
+    end := start + p.Limit
+    if end > len(tmp) { end = len(tmp) }
+    out := make([]*domain.{{.Name}}, end-start)
+    copy(out, tmp[start:end])
     return out, nil
 }
 
-func (r *{{.Name}}Repository) Update(ctx context.Context, in *usecase.{{.Name}}) (*usecase.{{.Name}}, error) {
+func (r *{{.Name}}Repository) Update(ctx context.Context, in *domain.{{.Name}}) (*domain.{{.Name}}, error) {
     r.mu.Lock()
     defer r.mu.Unlock()
     if _, ok := r.data[in.ID]; !ok {
@@ -588,13 +612,13 @@ import (
 
     "gorm.io/gorm"
 
-    "{{.Module}}/internal/usecase"
+    "{{.Module}}/internal/domain"
 )
 
 type {{.Name}}Model struct {
     ID int64 ` + "`gorm:\"primaryKey;autoIncrement\"`" + `
 {{- range .Fields }}
-    {{.GoName}} {{if eq .ProtoType "int32"}}int32{{else if eq .ProtoType "int64"}}int64{{else if eq .ProtoType "bool"}}bool{{else}}string{{end}} ` + "`gorm:\"column:{{.DBName}};not null\"`" + `
+    {{.GoName}} {{if eq .ProtoType "int32"}}int32{{else if eq .ProtoType "int64"}}int64{{else if eq .ProtoType "uint32"}}uint32{{else if eq .ProtoType "uint64"}}uint64{{else if eq .ProtoType "bool"}}bool{{else}}string{{end}} ` + "`gorm:\"column:{{.DBName}};not null\"`" + `
 {{- end }}
     CreatedAt time.Time ` + "`gorm:\"column:created_at;autoCreateTime\"`" + `
     UpdatedAt time.Time ` + "`gorm:\"column:updated_at;autoUpdateTime\"`" + `
@@ -606,7 +630,7 @@ type {{.Name}}Repository struct{ db *gorm.DB }
 
 func New{{.Name}}Repository(db *gorm.DB) *{{.Name}}Repository { return &{{.Name}}Repository{db: db} }
 
-func (r *{{.Name}}Repository) Create(ctx context.Context, in *usecase.{{.Name}}) (*usecase.{{.Name}}, error) {
+func (r *{{.Name}}Repository) Create(ctx context.Context, in *domain.{{.Name}}) (*domain.{{.Name}}, error) {
     m := {{.Name}}Model{
 {{- range .Fields }}
         {{.GoName}}: in.{{.GoName}},
@@ -620,7 +644,7 @@ func (r *{{.Name}}Repository) Create(ctx context.Context, in *usecase.{{.Name}})
     return &out, nil
 }
 
-func (r *{{.Name}}Repository) Get(ctx context.Context, id int64) (*usecase.{{.Name}}, error) {
+func (r *{{.Name}}Repository) Get(ctx context.Context, id int64) (*domain.{{.Name}}, error) {
     var m {{.Name}}Model
     if err := r.db.WithContext(ctx).First(&m, id).Error; err != nil {
         if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -628,7 +652,7 @@ func (r *{{.Name}}Repository) Get(ctx context.Context, id int64) (*usecase.{{.Na
         }
         return nil, err
     }
-    return &usecase.{{.Name}}{
+    return &domain.{{.Name}}{
         ID: m.ID,
 {{- range .Fields }}
         {{.GoName}}: m.{{.GoName}},
@@ -636,25 +660,27 @@ func (r *{{.Name}}Repository) Get(ctx context.Context, id int64) (*usecase.{{.Na
     }, nil
 }
 
-func (r *{{.Name}}Repository) List(ctx context.Context) ([]*usecase.{{.Name}}, error) {
+func (r *{{.Name}}Repository) List(ctx context.Context, p domain.ListParams) ([]*domain.{{.Name}}, error) {
     var rows []{{.Name}}Model
-    if err := r.db.WithContext(ctx).Order("id DESC").Find(&rows).Error; err != nil {
+    p = p.Sanitize()
+    q := r.db.WithContext(ctx).Order("id DESC").Offset(p.Offset).Limit(p.Limit)
+    if err := q.Find(&rows).Error; err != nil {
         return nil, err
     }
-    out := make([]*usecase.{{.Name}}, 0, len(rows))
+    out := make([]*domain.{{.Name}}, 0, len(rows))
     for _, m := range rows {
-        it := usecase.{{.Name}}{
+        it := domain.{{.Name}}{
             ID: m.ID,
-{{- range .Fields }}
+            {{- range .Fields }}
             {{.GoName}}: m.{{.GoName}},
-{{- end }}
+            {{- end }}
         }
         out = append(out, &it)
     }
     return out, nil
 }
 
-func (r *{{.Name}}Repository) Update(ctx context.Context, in *usecase.{{.Name}}) (*usecase.{{.Name}}, error) {
+func (r *{{.Name}}Repository) Update(ctx context.Context, in *domain.{{.Name}}) (*domain.{{.Name}}, error) {
     updates := map[string]interface{}{
 {{- range .Fields }}
         "{{.DBName}}": in.{{.GoName}},

@@ -84,6 +84,23 @@ make protogen
   - `make scaffold name=User fields="..." mem=1`
   - もしくは `go run ./cmd/scaffold -name User -fields "..." -with-memory`
 
+### Fields（対応型）
+- 指定例: `make scaffold name=Device fields="name:string level:int8 code:uint8 serial:uint32 big:uint64 ok:bool note:text"`
+- サポート型（左: 指定値 → 右: Proto/Go/SQL）
+  - `string` → string / string / VARCHAR(255)
+  - `text` → string / string / TEXT
+  - `bool` → bool / bool / TINYINT(1)
+  - `int`, `int32` → int32 / int32 / INT
+  - `int8` → int32 / int32 / TINYINT
+  - `int64` → int64 / int64 / BIGINT
+  - `uint8` → uint32 / uint32 / TINYINT UNSIGNED
+  - `uint32` → uint32 / uint32 / INT UNSIGNED
+  - `uint64` → uint64 / uint64 / BIGINT UNSIGNED
+
+注意
+- Protobufにはint8/uint8の直接型がないため、`int8` は `int32`、`uint8` は `uint32` として表現します（Go/SQLは上記の通り）。
+- 予約語（`text`/`order`/`group`/`value`）はフィールド名に使用できません。別名（例: `value_col`）に変更してください。
+
 ---
 
 ## ディレクトリ構成

@@ -23,8 +23,10 @@ echo "[clear] removing generated files for: ${NAME} (${SNAKE})"
 rm -rf \
   "proto/${SNAKE}" \
   "gen/${SNAKE}" \
+  "internal/domain/${SNAKE}.go" \
   "internal/usecase/${SNAKE}_usecase.go" \
   "internal/adapter/grpc/${SNAKE}_handler.go" \
+  "internal/adapter/grpc/${SNAKE}_routes.go" \
   "internal/adapter/repository/memory/${SNAKE}_repository.go" \
   "internal/adapter/repository/mysql/${SNAKE}_repository.go" \
   2>/dev/null || true
@@ -69,4 +71,3 @@ fi
 
 docker compose restart api >/dev/null 2>&1 || true
 echo "[clear] done"
-
