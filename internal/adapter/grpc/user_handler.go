@@ -6,7 +6,7 @@ import (
 	"connectrpc.com/connect"
 	userv1 "github.com/xiao1203/go-onion-grpc-template/gen/user/v1"
 	"github.com/xiao1203/go-onion-grpc-template/internal/auth"
-	"github.com/xiao1203/go-onion-grpc-template/internal/domain"
+	"github.com/xiao1203/go-onion-grpc-template/internal/domain/entity"
 	"github.com/xiao1203/go-onion-grpc-template/internal/usecase"
 )
 
@@ -40,7 +40,7 @@ func (h *UserHandler) UpdateMyProfile(ctx context.Context, req *connect.Request[
 	return connect.NewResponse(res), nil
 }
 
-func toProtoUser(u *domain.User) *userv1.User {
+func toProtoUser(u *entity.User) *userv1.User {
 	if u == nil {
 		return nil
 	}

@@ -6,6 +6,7 @@ import (
 	"connectrpc.com/connect"
 	samplev1 "github.com/xiao1203/go-onion-grpc-template/gen/sample/v1"
 	"github.com/xiao1203/go-onion-grpc-template/internal/domain"
+	"github.com/xiao1203/go-onion-grpc-template/internal/domain/entity"
 	"github.com/xiao1203/go-onion-grpc-template/internal/usecase"
 )
 
@@ -21,7 +22,7 @@ func (h *SampleHandler) CreateSample(
 	ctx context.Context,
 	req *connect.Request[samplev1.CreateSampleRequest],
 ) (*connect.Response[samplev1.CreateSampleResponse], error) {
-	in := &domain.Sample{
+	in := &entity.Sample{
 		Name:    req.Msg.GetName(),
 		Content: req.Msg.GetContent(),
 		Count:   req.Msg.GetCount(),
@@ -67,7 +68,7 @@ func (h *SampleHandler) UpdateSample(
 	ctx context.Context,
 	req *connect.Request[samplev1.UpdateSampleRequest],
 ) (*connect.Response[samplev1.UpdateSampleResponse], error) {
-	in := &domain.Sample{
+	in := &entity.Sample{
 		ID:      req.Msg.GetId(),
 		Name:    req.Msg.GetName(),
 		Content: req.Msg.GetContent(),
@@ -90,7 +91,7 @@ func (h *SampleHandler) DeleteSample(
 	return connect.NewResponse(&samplev1.DeleteSampleResponse{}), nil
 }
 
-func toProtoSample(in *domain.Sample) *samplev1.Sample {
+func toProtoSample(in *entity.Sample) *samplev1.Sample {
 	if in == nil {
 		return nil
 	}

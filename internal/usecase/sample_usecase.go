@@ -3,34 +3,28 @@ package usecase
 import (
 	"context"
 	"github.com/xiao1203/go-onion-grpc-template/internal/domain"
+	"github.com/xiao1203/go-onion-grpc-template/internal/domain/entity"
+	domainrepo "github.com/xiao1203/go-onion-grpc-template/internal/domain/repository"
 )
 
-type SampleRepository interface {
-	Create(ctx context.Context, in *domain.Sample) (*domain.Sample, error)
-	Get(ctx context.Context, id int64) (*domain.Sample, error)
-	List(ctx context.Context, p domain.ListParams) ([]*domain.Sample, error)
-	Update(ctx context.Context, in *domain.Sample) (*domain.Sample, error)
-	Delete(ctx context.Context, id int64) error
-}
-
 type SampleUsecase struct {
-	repo SampleRepository
+	repo domainrepo.SampleRepository
 }
 
-func NewSampleUsecase(repo SampleRepository) *SampleUsecase {
+func NewSampleUsecase(repo domainrepo.SampleRepository) *SampleUsecase {
 	return &SampleUsecase{repo: repo}
 }
 
-func (u *SampleUsecase) Create(ctx context.Context, in *domain.Sample) (*domain.Sample, error) {
+func (u *SampleUsecase) Create(ctx context.Context, in *entity.Sample) (*entity.Sample, error) {
 	return u.repo.Create(ctx, in)
 }
-func (u *SampleUsecase) Get(ctx context.Context, id int64) (*domain.Sample, error) {
+func (u *SampleUsecase) Get(ctx context.Context, id int64) (*entity.Sample, error) {
 	return u.repo.Get(ctx, id)
 }
-func (u *SampleUsecase) List(ctx context.Context, p domain.ListParams) ([]*domain.Sample, error) {
+func (u *SampleUsecase) List(ctx context.Context, p domain.ListParams) ([]*entity.Sample, error) {
 	return u.repo.List(ctx, p)
 }
-func (u *SampleUsecase) Update(ctx context.Context, in *domain.Sample) (*domain.Sample, error) {
+func (u *SampleUsecase) Update(ctx context.Context, in *entity.Sample) (*entity.Sample, error) {
 	return u.repo.Update(ctx, in)
 }
 func (u *SampleUsecase) Delete(ctx context.Context, id int64) error {

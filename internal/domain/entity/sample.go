@@ -1,4 +1,4 @@
-package domain
+package entity
 
 type Sample struct {
 	ID      int64

@@ -9,6 +9,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/xiao1203/go-onion-grpc-template/internal/adapter/repository/mysql"
 	"github.com/xiao1203/go-onion-grpc-template/internal/domain"
+	"github.com/xiao1203/go-onion-grpc-template/internal/domain/entity"
 	"github.com/xiao1203/go-onion-grpc-template/util/testhelper"
 	"gorm.io/gorm"
 )
@@ -23,18 +24,18 @@ func TestSampleRepository_Create(t *testing.T) {
 	tests := []struct {
 		name string // description of this test case
 		// Named input parameters for target function.
-		in      *domain.Sample
-		want    *domain.Sample
+		in      *entity.Sample
+		want    *entity.Sample
 		wantErr bool
 	}{
 		{
 			name: "正常系: Sampleの作成に成功すること",
-			in: &domain.Sample{
+			in: &entity.Sample{
 				Name:    "sample name",
 				Content: "sample content",
 				Count:   10,
 			},
-			want: &domain.Sample{
+			want: &entity.Sample{
 				ID:      1, // 無視するので値は何でも良い
 				Name:    "sample name",
 				Content: "sample content",
@@ -58,7 +59,7 @@ func TestSampleRepository_Create(t *testing.T) {
 			} else {
 
 				opts := cmp.Options{
-					cmpopts.IgnoreFields(domain.Sample{}, "ID"),
+					cmpopts.IgnoreFields(entity.Sample{}, "ID"),
 				}
 
 				if diff := cmp.Diff(tt.want, got, opts); diff != "" {
@@ -80,13 +81,13 @@ func TestSampleRepository_Get(t *testing.T) {
 		name string // description of this test case
 		// Named input parameters for target function.
 		id      int64
-		want    *domain.Sample
+		want    *entity.Sample
 		wantErr bool
 	}{
 		{
 			name: "正常系: IDに対応するSampleデータを取得できること",
 			id:   1,
-			want: &domain.Sample{
+			want: &entity.Sample{
 				ID:      1,
 				Name:    "test_name_1",
 				Content: "test_content_1",
@@ -127,7 +128,7 @@ func TestSampleRepository_List(t *testing.T) {
 		name string // description of this test case
 		// Named input parameters for target function.
 		p       domain.ListParams
-		want    []*domain.Sample
+		want    []*entity.Sample
 		wantErr bool
 	}{
 		{
@@ -136,7 +137,7 @@ func TestSampleRepository_List(t *testing.T) {
 				Offset: 0,
 				Limit:  100,
 			},
-			want: []*domain.Sample{
+			want: []*entity.Sample{
 				{
 					ID:      3,
 					Name:    "test_name_3",
@@ -164,7 +165,7 @@ func TestSampleRepository_List(t *testing.T) {
 				Offset: 1,
 				Limit:  1,
 			},
-			want: []*domain.Sample{
+			want: []*entity.Sample{
 				{
 					ID:      2,
 					Name:    "test_name_2",
@@ -206,19 +207,19 @@ func TestSampleRepository_Update(t *testing.T) {
 	tests := []struct {
 		name string // description of this test case
 		// Named input parameters for receiver constructor.
-		in      *domain.Sample
-		want    *domain.Sample
+		in      *entity.Sample
+		want    *entity.Sample
 		wantErr bool
 	}{
 		{
 			name: "正常系: 指定したIDのSampleレコードの更新に成功すること",
-			in: &domain.Sample{
+			in: &entity.Sample{
 				ID:      1,
 				Name:    "updated_name",
 				Content: "updated_content",
 				Count:   100,
 			},
-			want: &domain.Sample{
+			want: &entity.Sample{
 				ID:      1,
 				Name:    "updated_name",
 				Content: "updated_content",

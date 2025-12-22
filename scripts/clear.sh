@@ -23,7 +23,8 @@ echo "[clear] removing generated files for: ${NAME} (${SNAKE})"
 rm -rf \
   "proto/${SNAKE}" \
   "gen/${SNAKE}" \
-  "internal/domain/${SNAKE}.go" \
+  "internal/domain/entity/${SNAKE}.go" \
+  "internal/domain/repository/${SNAKE}_repository.go" \
   "internal/usecase/${SNAKE}_usecase.go" \
   "internal/adapter/grpc/${SNAKE}_handler.go" \
   "internal/adapter/grpc/${SNAKE}_routes.go" \

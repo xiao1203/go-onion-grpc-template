@@ -9,6 +9,8 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/xiao1203/go-onion-grpc-template/internal/domain"
+	"github.com/xiao1203/go-onion-grpc-template/internal/domain/entity"
+	domainrepo "github.com/xiao1203/go-onion-grpc-template/internal/domain/repository"
 )
 
 type SampleModel struct {
@@ -24,9 +26,9 @@ func (SampleModel) TableName() string { return "samples" }
 
 type SampleRepository struct{ db *gorm.DB }
 
-func NewSampleRepository(db *gorm.DB) *SampleRepository { return &SampleRepository{db: db} }
+func NewSampleRepository(db *gorm.DB) domainrepo.SampleRepository { return &SampleRepository{db: db} }
 
-func (r *SampleRepository) Create(ctx context.Context, in *domain.Sample) (*domain.Sample, error) {
+func (r *SampleRepository) Create(ctx context.Context, in *entity.Sample) (*entity.Sample, error) {
 	m := SampleModel{
 		Name:    in.Name,
 		Content: in.Content,
@@ -40,7 +42,7 @@ func (r *SampleRepository) Create(ctx context.Context, in *domain.Sample) (*doma
 	return &out, nil
 }
 
-func (r *SampleRepository) Get(ctx context.Context, id int64) (*domain.Sample, error) {
+func (r *SampleRepository) Get(ctx context.Context, id int64) (*entity.Sample, error) {
 	var m SampleModel
 	if err := r.db.WithContext(ctx).First(&m, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -48,7 +50,7 @@ func (r *SampleRepository) Get(ctx context.Context, id int64) (*domain.Sample, e
 		}
 		return nil, err
 	}
-	return &domain.Sample{
+	return &entity.Sample{
 		ID:      m.ID,
 		Name:    m.Name,
 		Content: m.Content,
@@ -56,16 +58,16 @@ func (r *SampleRepository) Get(ctx context.Context, id int64) (*domain.Sample, e
 	}, nil
 }
 
-func (r *SampleRepository) List(ctx context.Context, p domain.ListParams) ([]*domain.Sample, error) {
+func (r *SampleRepository) List(ctx context.Context, p domain.ListParams) ([]*entity.Sample, error) {
 	var rows []SampleModel
 	p = p.Sanitize()
 	q := r.db.WithContext(ctx).Order("id DESC").Offset(p.Offset).Limit(p.Limit)
 	if err := q.Find(&rows).Error; err != nil {
 		return nil, err
 	}
-	out := make([]*domain.Sample, 0, len(rows))
+	out := make([]*entity.Sample, 0, len(rows))
 	for _, m := range rows {
-		it := domain.Sample{
+		it := entity.Sample{
 			ID:      m.ID,
 			Name:    m.Name,
 			Content: m.Content,
@@ -76,7 +78,7 @@ func (r *SampleRepository) List(ctx context.Context, p domain.ListParams) ([]*do
 	return out, nil
 }
 
-func (r *SampleRepository) Update(ctx context.Context, in *domain.Sample) (*domain.Sample, error) {
+func (r *SampleRepository) Update(ctx context.Context, in *entity.Sample) (*entity.Sample, error) {
 	updates := map[string]interface{}{
 		"name":       in.Name,
 		"content":    in.Content,

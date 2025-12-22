@@ -47,7 +47,8 @@ scaffold-clean:
 	@name='$(name)'; \
     snake=$$(printf "%s" $$name | sed -E 's/([A-Z])/_\1/g' | sed -E 's/^_//' | tr '[:upper:]' '[:lower:]'); \
     rm -rf proto/$$snake gen/$$snake \
-      internal/domain/$${snake}.go \
+      internal/domain/entity/$${snake}.go \
+      internal/domain/repository/$${snake}_repository.go \
       internal/usecase/$${snake}_usecase.go \
       internal/adapter/grpc/$${snake}_handler.go \
       internal/adapter/grpc/$${snake}_routes.go \
