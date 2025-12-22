@@ -26,7 +26,13 @@ make scaffold-all name=Article fields="name:string content:string"
 ```
 
 実行内容（自動）
-- proto/handler/usecase/repository(mysql)/routes/schema.sql を生成
+- proto を生成
+- internal/domain/entity（エンティティ）を生成
+- internal/domain/repository（ドメイン側のRepositoryインターフェース）を生成
+- internal/usecase を生成（domain/repository に依存）
+- internal/adapter/repository/mysql（実装）を生成
+- internal/adapter/grpc/{handler,routes} を生成（レジストリ登録）
+- db/schema.sql を追記
 - buf generate によるコード生成（gen 配下）
 - mysqldef で dev/test DB へ適用
 - API 再起動 → curl（内蔵の curler サービス）で Create/Get/List を叩いて疎通確認
@@ -110,8 +116,10 @@ make protogen
 │ └── server/
 │ └── main.go # エントリポイント
 ├── internal/
-│ ├── domain/ # ドメインモデル
-│ ├── usecase/ # ユースケース
+│ ├── domain/ # ドメイン層
+│ │   ├── entity/       # エンティティ / 値オブジェクト
+│ │   └── repository/   # 永続化境界（Repositoryインターフェース）
+│ ├── usecase/ # ユースケース（アプリケーションサービス）
 │ └── adapter/
 │   ├── grpc/ # gRPC / connect ハンドラ + ルート登録（registry）
 │   │   ├── registry.go # レジストリ本体（Add / RegisterAll）
@@ -139,13 +147,14 @@ make protogen
         ↓
     [Usecase]
         ↓
-   [Repository IF]
+   [Repository IF (domain)]
         ↓
 [Repository Impl (memory / mysql / ent)]
 ```
 
 
-- usecase は DB / gRPC / フレームワークを知らない
+- usecase は DB / gRPC / フレームワークを知らない（domain のみ依存）
+- Repository インターフェースは domain 配下（internal/domain/repository）に配置
 - DB や ORM（ent）は adapter に閉じ込める
 - 将来の技術変更に強い構成
 
@@ -317,6 +326,8 @@ make migrate [DROP_FLAGS="--enable-drop"]
 ### clear の動作（レジストリ方式）
 - 削除対象
   - `proto/<entity>` / `gen/<entity>`
+  - `internal/domain/entity/<entity>.go`
+  - `internal/domain/repository/<entity>_repository.go`
   - `internal/usecase/<entity>_usecase.go`
   - `internal/adapter/grpc/<entity>_{handler,routes}.go`
   - `internal/adapter/repository/{memory,mysql}/<entity>_repository.go`
