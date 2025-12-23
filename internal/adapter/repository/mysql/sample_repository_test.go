@@ -18,7 +18,7 @@ func TestSampleRepository_Create(t *testing.T) {
 	testhelper.Lock(t)
 	testhelper.EnsureTestDBEnv(t)
 	testDB := testhelper.OpenGormTestDB(t)
-
+	repository := mysql.NewSampleRepository(testDB)
 	ctx := context.Background()
 
 	tests := []struct {
@@ -46,8 +46,7 @@ func TestSampleRepository_Create(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := mysql.NewSampleRepository(testDB)
-			got, gotErr := r.Create(ctx, tt.in)
+			got, gotErr := repository.Create(ctx, tt.in)
 			if gotErr != nil {
 				if !tt.wantErr {
 					t.Errorf("Create() failed: %v", gotErr)
@@ -57,7 +56,6 @@ func TestSampleRepository_Create(t *testing.T) {
 			if tt.wantErr {
 				t.Fatal("Create() succeeded unexpectedly")
 			} else {
-
 				opts := cmp.Options{
 					cmpopts.IgnoreFields(entity.Sample{}, "ID"),
 				}
@@ -75,6 +73,7 @@ func TestSampleRepository_Get(t *testing.T) {
 	testhelper.EnsureTestDBEnv(t)
 	testhelper.LoadTestFixtures(t, testfixtures.Directory("testdata/fixture/sample"))
 	testDB := testhelper.OpenGormTestDB(t)
+	repository := mysql.NewSampleRepository(testDB)
 	ctx := context.Background()
 
 	tests := []struct {
@@ -98,8 +97,7 @@ func TestSampleRepository_Get(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := mysql.NewSampleRepository(testDB)
-			got, gotErr := r.Get(ctx, tt.id)
+			got, gotErr := repository.Get(ctx, tt.id)
 			if gotErr != nil {
 				if !tt.wantErr {
 					t.Errorf("Get() failed: %v", gotErr)
@@ -122,6 +120,7 @@ func TestSampleRepository_List(t *testing.T) {
 	testhelper.EnsureTestDBEnv(t)
 	testhelper.LoadTestFixtures(t, testfixtures.Directory("testdata/fixture/sample"))
 	testDB := testhelper.OpenGormTestDB(t)
+	repository := mysql.NewSampleRepository(testDB)
 	ctx := context.Background()
 
 	tests := []struct {
@@ -178,8 +177,7 @@ func TestSampleRepository_List(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := mysql.NewSampleRepository(testDB)
-			got, gotErr := r.List(ctx, tt.p)
+			got, gotErr := repository.List(ctx, tt.p)
 			if gotErr != nil {
 				if !tt.wantErr {
 					t.Errorf("List() failed: %v", gotErr)
@@ -202,6 +200,7 @@ func TestSampleRepository_Update(t *testing.T) {
 	testhelper.EnsureTestDBEnv(t)
 	testhelper.LoadTestFixtures(t, testfixtures.Directory("testdata/fixture/sample"))
 	testDB := testhelper.OpenGormTestDB(t)
+	repository := mysql.NewSampleRepository(testDB)
 	ctx := context.Background()
 
 	tests := []struct {
@@ -230,8 +229,7 @@ func TestSampleRepository_Update(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := mysql.NewSampleRepository(testDB)
-			got, gotErr := r.Update(ctx, tt.in)
+			got, gotErr := repository.Update(ctx, tt.in)
 			if gotErr != nil {
 				if !tt.wantErr {
 					t.Errorf("Update() failed: %v", gotErr)
@@ -254,6 +252,7 @@ func TestSampleRepository_Delete(t *testing.T) {
 	testhelper.EnsureTestDBEnv(t)
 	testhelper.LoadTestFixtures(t, testfixtures.Directory("testdata/fixture/sample"))
 	testDB := testhelper.OpenGormTestDB(t)
+	repository := mysql.NewSampleRepository(testDB)
 	ctx := context.Background()
 
 	tests := []struct {
@@ -273,8 +272,7 @@ func TestSampleRepository_Delete(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := mysql.NewSampleRepository(testDB)
-			gotErr := r.Delete(ctx, tt.id)
+			gotErr := repository.Delete(ctx, tt.id)
 			if gotErr != nil {
 				if !tt.wantErr {
 					t.Errorf("Delete() failed: %v", gotErr)
