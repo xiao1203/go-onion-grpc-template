@@ -6,7 +6,7 @@ require connectrpc.com/connect v1.19.1
 
 require (
 	github.com/go-sql-driver/mysql v1.9.3
-	github.com/golang-jwt/jwt/v5 v5.2.1
+	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/newmo-oss/ergo v0.1.0
 	google.golang.org/protobuf v1.36.11
 	gorm.io/driver/mysql v1.6.0
