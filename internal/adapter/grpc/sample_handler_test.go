@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"connectrpc.com/connect"
@@ -58,6 +59,16 @@ func TestSampleHandler_CreateSample(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "異常系: nameが長すぎる場合はInternalエラーになること",
+			args: args{
+				req: func() *connect.Request[samplev1.CreateSampleRequest] {
+					long := strings.Repeat("x", 300)
+					return connect.NewRequest(&samplev1.CreateSampleRequest{Name: long, Content: "ok", Count: 1})
+				}(),
+			},
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -65,6 +76,10 @@ func TestSampleHandler_CreateSample(t *testing.T) {
 			if gotErr != nil {
 				if !tt.wantErr {
 					t.Errorf("CreateSample() failed: %v", gotErr)
+				}
+				// error path: check code is Internal
+				if connect.CodeOf(gotErr) != connect.CodeInternal {
+					t.Fatalf("want CodeInternal, got %v", connect.CodeOf(gotErr))
 				}
 				return
 			}
@@ -135,18 +150,42 @@ func TestSampleHandler_ListSamples(t *testing.T) {
 
 	client := samplev1connect.NewSampleServiceClient(server.Client(), server.URL)
 
-	req := connect.NewRequest(&samplev1.ListSamplesRequest{})
-	got, err := client.ListSamples(ctx, req)
-	if err != nil {
-		t.Fatalf("ListSamples() error = %v", err)
+	type args struct {
+		req *connect.Request[samplev1.ListSamplesRequest]
 	}
-	want := []*samplev1.Sample{
-		{Id: 3, Name: "test_name_3", Content: "test_content_3", Count: 3},
-		{Id: 2, Name: "test_name_2", Content: "test_content_2", Count: 2},
-		{Id: 1, Name: "test_name_1", Content: "test_content_1", Count: 1},
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name:    "正常系: データが存在する場合、全件取得できること",
+			args:    args{req: connect.NewRequest(&samplev1.ListSamplesRequest{})},
+			wantErr: false,
+		},
 	}
-	if diff := cmp.Diff(want, got.Msg.GetSamples(), protocmp.Transform()); diff != "" {
-		t.Errorf("ListSamples mismatch (-want +got):\n%s", diff)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, gotErr := client.ListSamples(ctx, tt.args.req)
+			if gotErr != nil {
+				if !tt.wantErr {
+					t.Errorf("ListSamples() failed: %v", gotErr)
+				}
+				return
+			}
+			if tt.wantErr {
+				t.Fatal("ListSamples() succeeded unexpectedly")
+			} else {
+				want := []*samplev1.Sample{
+					{Id: 3, Name: "test_name_3", Content: "test_content_3", Count: 3},
+					{Id: 2, Name: "test_name_2", Content: "test_content_2", Count: 2},
+					{Id: 1, Name: "test_name_1", Content: "test_content_1", Count: 1},
+				}
+				if diff := cmp.Diff(want, got.Msg.GetSamples(), protocmp.Transform()); diff != "" {
+					t.Errorf("ListSamples mismatch (-want +got):\n%s", diff)
+				}
+			}
+		})
 	}
 }
 
@@ -170,14 +209,49 @@ func TestSampleHandler_UpdateSample(t *testing.T) {
 
 	client := samplev1connect.NewSampleServiceClient(server.Client(), server.URL)
 
-	req := connect.NewRequest(&samplev1.UpdateSampleRequest{Id: 1, Name: "updated_name", Content: "updated_content", Count: 100})
-	got, err := client.UpdateSample(ctx, req)
-	if err != nil {
-		t.Fatalf("UpdateSample() error = %v", err)
+	type args struct {
+		req *connect.Request[samplev1.UpdateSampleRequest]
 	}
-	want := &samplev1.Sample{Id: 1, Name: "updated_name", Content: "updated_content", Count: 100}
-	if diff := cmp.Diff(want, got.Msg.GetSample(), protocmp.Transform()); diff != "" {
-		t.Errorf("UpdateSample mismatch (-want +got):\n%s", diff)
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name:    "正常系: 指定したIDのSampleレコードの更新に成功すること",
+			args:    args{req: connect.NewRequest(&samplev1.UpdateSampleRequest{Id: 1, Name: "updated_name", Content: "updated_content", Count: 100})},
+			wantErr: false,
+		},
+		{
+			name: "異常系: nameが長すぎる場合はInternalエラーになること",
+			args: args{req: func() *connect.Request[samplev1.UpdateSampleRequest] {
+				long := strings.Repeat("y", 300)
+				return connect.NewRequest(&samplev1.UpdateSampleRequest{Id: 1, Name: long, Content: "ok", Count: 1})
+			}()},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, gotErr := client.UpdateSample(ctx, tt.args.req)
+			if gotErr != nil {
+				if !tt.wantErr {
+					t.Errorf("UpdateSample() failed: %v", gotErr)
+				}
+				if connect.CodeOf(gotErr) != connect.CodeInternal {
+					t.Fatalf("want CodeInternal, got %v", connect.CodeOf(gotErr))
+				}
+				return
+			}
+			if tt.wantErr {
+				t.Fatal("UpdateSample() succeeded unexpectedly")
+			} else {
+				want := &samplev1.Sample{Id: 1, Name: "updated_name", Content: "updated_content", Count: 100}
+				if diff := cmp.Diff(want, got.Msg.GetSample(), protocmp.Transform()); diff != "" {
+					t.Errorf("UpdateSample mismatch (-want +got):\n%s", diff)
+				}
+			}
+		})
 	}
 }
 
@@ -201,17 +275,42 @@ func TestSampleHandler_DeleteSample(t *testing.T) {
 
 	client := samplev1connect.NewSampleServiceClient(server.Client(), server.URL)
 
-	delReq := connect.NewRequest(&samplev1.DeleteSampleRequest{Id: 1})
-	if _, err := client.DeleteSample(ctx, delReq); err != nil {
-		t.Fatalf("DeleteSample() error = %v", err)
+	type args struct {
+		req *connect.Request[samplev1.DeleteSampleRequest]
 	}
-	// verify deleted
-	getReq := connect.NewRequest(&samplev1.GetSampleRequest{Id: 1})
-	got, err := client.GetSample(ctx, getReq)
-	if err != nil {
-		t.Fatalf("GetSample() after delete error = %v", err)
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name:    "正常系: 指定したIDのSampleレコードの削除に成功すること",
+			args:    args{req: connect.NewRequest(&samplev1.DeleteSampleRequest{Id: 1})},
+			wantErr: false,
+		},
 	}
-	if got.Msg.GetSample() != nil {
-		t.Fatalf("GetSample() after delete = %#v, want nil Sample", got.Msg.GetSample())
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, gotErr := client.DeleteSample(ctx, tt.args.req)
+			if gotErr != nil {
+				if !tt.wantErr {
+					t.Errorf("DeleteSample() failed: %v", gotErr)
+				}
+				return
+			}
+			if tt.wantErr {
+				t.Fatal("DeleteSample() succeeded unexpectedly")
+			} else {
+				// ensure deleted
+				getReq := connect.NewRequest(&samplev1.GetSampleRequest{Id: tt.args.req.Msg.GetId()})
+				got, err := client.GetSample(ctx, getReq)
+				if err != nil {
+					t.Fatalf("GetSample() after delete error = %v", err)
+				}
+				if got.Msg.GetSample() != nil {
+					t.Fatalf("GetSample() after delete = %#v, want nil Sample", got.Msg.GetSample())
+				}
+			}
+		})
 	}
 }

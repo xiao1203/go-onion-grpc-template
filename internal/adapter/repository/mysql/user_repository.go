@@ -46,11 +46,11 @@ func (r *UserRepository) FindByID(ctx context.Context, id int64) (*entity.User, 
         if errors.Is(err, gorm.ErrRecordNotFound) {
             return nil, nil
         }
-        return nil, ergo.WithCode(err, apperr.Internal)
+        return nil, ergo.WithCode(ergo.Wrap(err, "gorm First users"), apperr.Internal)
     }
 	roles, err := r.loadRoles(ctx, id)
     if err != nil {
-        return nil, ergo.WithCode(err, apperr.Internal)
+        return nil, ergo.WithCode(ergo.Wrap(err, "gorm load roles"), apperr.Internal)
     }
 	return &entity.User{
 		ID:          u.ID,
@@ -66,7 +66,7 @@ func (r *UserRepository) UpdateProfile(ctx context.Context, id int64, displayNam
         "display_name": displayName,
         "picture_url":  pictureURL,
     }).Error; err != nil {
-        return nil, ergo.WithCode(err, apperr.Internal)
+        return nil, ergo.WithCode(ergo.Wrap(err, "gorm Updates users"), apperr.Internal)
     }
 	return r.FindByID(ctx, id)
 }

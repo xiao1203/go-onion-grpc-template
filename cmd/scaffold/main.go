@@ -659,7 +659,7 @@ func (r *{{.Name}}Repository) Create(ctx context.Context, in *entity.{{.Name}}) 
 {{- end }}
     }
     if err := r.db.WithContext(ctx).Create(&m).Error; err != nil {
-        return nil, ergo.WithCode(err, apperr.Internal)
+        return nil, ergo.WithCode(ergo.Wrap(err, "gorm Create {{.Table}}"), apperr.Internal)
     }
     out := *in
     out.ID = m.ID
@@ -672,7 +672,7 @@ func (r *{{.Name}}Repository) Get(ctx context.Context, id int64) (*entity.{{.Nam
         if errors.Is(err, gorm.ErrRecordNotFound) {
             return nil, nil
         }
-        return nil, ergo.WithCode(err, apperr.Internal)
+        return nil, ergo.WithCode(ergo.Wrap(err, "gorm First {{.Table}}"), apperr.Internal)
     }
     return &entity.{{.Name}}{
         ID: m.ID,
@@ -687,7 +687,7 @@ func (r *{{.Name}}Repository) List(ctx context.Context, p domain.ListParams) ([]
     p = p.Sanitize()
     q := r.db.WithContext(ctx).Order("id DESC").Offset(p.Offset).Limit(p.Limit)
     if err := q.Find(&rows).Error; err != nil {
-        return nil, ergo.WithCode(err, apperr.Internal)
+        return nil, ergo.WithCode(ergo.Wrap(err, "gorm Find {{.Table}}"), apperr.Internal)
     }
     out := make([]*entity.{{.Name}}, 0, len(rows))
     for _, m := range rows {
@@ -710,14 +710,14 @@ func (r *{{.Name}}Repository) Update(ctx context.Context, in *entity.{{.Name}}) 
         "updated_at": time.Now(),
     }
     if err := r.db.WithContext(ctx).Model(&{{.Name}}Model{}).Where("id = ?", in.ID).Updates(updates).Error; err != nil {
-        return nil, ergo.WithCode(err, apperr.Internal)
+        return nil, ergo.WithCode(ergo.Wrap(err, "gorm Updates {{.Table}}"), apperr.Internal)
     }
     return r.Get(ctx, in.ID)
 }
 
 func (r *{{.Name}}Repository) Delete(ctx context.Context, id int64) error {
     if err := r.db.WithContext(ctx).Delete(&{{.Name}}Model{}, id).Error; err != nil {
-        return ergo.WithCode(err, apperr.Internal)
+        return ergo.WithCode(ergo.Wrap(err, "gorm Delete {{.Table}}"), apperr.Internal)
     }
     return nil
 }

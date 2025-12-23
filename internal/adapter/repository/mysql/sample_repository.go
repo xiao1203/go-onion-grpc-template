@@ -13,6 +13,7 @@ import (
     "github.com/xiao1203/go-onion-grpc-template/internal/domain"
     "github.com/xiao1203/go-onion-grpc-template/internal/domain/entity"
     domainrepo "github.com/xiao1203/go-onion-grpc-template/internal/domain/repository"
+    "log/slog"
 )
 
 type SampleModel struct {
@@ -37,7 +38,7 @@ func (r *SampleRepository) Create(ctx context.Context, in *entity.Sample) (*enti
 		Count:   in.Count,
 	}
     if err := r.db.WithContext(ctx).Create(&m).Error; err != nil {
-        return nil, ergo.WithCode(err, apperr.Internal)
+        return nil, ergo.WithCode(ergo.Wrap(err, "gorm Create samples"), apperr.Internal)
     }
 	out := *in
 	out.ID = m.ID
@@ -50,7 +51,7 @@ func (r *SampleRepository) Get(ctx context.Context, id int64) (*entity.Sample, e
         if errors.Is(err, gorm.ErrRecordNotFound) {
             return nil, nil
         }
-        return nil, ergo.WithCode(err, apperr.Internal)
+        return nil, ergo.WithCode(ergo.Wrap(err, "gorm First samples", slog.Int64("id", id)), apperr.Internal)
     }
 	return &entity.Sample{
 		ID:      m.ID,
@@ -65,7 +66,7 @@ func (r *SampleRepository) List(ctx context.Context, p domain.ListParams) ([]*en
 	p = p.Sanitize()
 	q := r.db.WithContext(ctx).Order("id DESC").Offset(p.Offset).Limit(p.Limit)
     if err := q.Find(&rows).Error; err != nil {
-        return nil, ergo.WithCode(err, apperr.Internal)
+        return nil, ergo.WithCode(ergo.Wrap(err, "gorm Find samples"), apperr.Internal)
     }
 	out := make([]*entity.Sample, 0, len(rows))
 	for _, m := range rows {
@@ -88,14 +89,14 @@ func (r *SampleRepository) Update(ctx context.Context, in *entity.Sample) (*enti
 		"updated_at": time.Now(),
 	}
     if err := r.db.WithContext(ctx).Model(&SampleModel{}).Where("id = ?", in.ID).Updates(updates).Error; err != nil {
-        return nil, ergo.WithCode(err, apperr.Internal)
+        return nil, ergo.WithCode(ergo.Wrap(err, "gorm Updates samples", slog.Int64("id", in.ID)), apperr.Internal)
     }
 	return r.Get(ctx, in.ID)
 }
 
 func (r *SampleRepository) Delete(ctx context.Context, id int64) error {
     if err := r.db.WithContext(ctx).Delete(&SampleModel{}, id).Error; err != nil {
-        return ergo.WithCode(err, apperr.Internal)
+        return ergo.WithCode(ergo.Wrap(err, "gorm Delete samples", slog.Int64("id", id)), apperr.Internal)
     }
     return nil
 }
