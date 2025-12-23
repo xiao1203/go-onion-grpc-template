@@ -17,9 +17,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("db open: %v", err)
 	}
-	if sqlDB, err := db.DB(); err == nil {
-		defer sqlDB.Close()
-	}
+    if sqlDB, err := db.DB(); err == nil {
+        defer func() { _ = sqlDB.Close() }()
+    }
 	grpcadapter.RegisterAll(mux, grpcadapter.Deps{Gorm: db})
 
 	addr := ":8080"
