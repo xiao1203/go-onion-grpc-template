@@ -324,6 +324,21 @@ make dry-run [DROP_FLAGS="--enable-drop"]
 make migrate [DROP_FLAGS="--enable-drop"]
 ```
 
+### Dependabot（自動依存アップデート）
+- 設定ファイル: `.github/dependabot.yml`
+- 対象エコシステムとスケジュール（JST）
+  - Go Modules（gomod）: 週次・月曜 03:00
+  - GitHub Actions: 週次・月曜 03:10
+  - Docker（Dockerfile）: 週次・月曜 03:20
+- PR運用
+  - 1回の実行で最大10件までPRを作成
+  - Goのパッチ更新はグルーピングして1PRに集約（labels: `dependencies`, `gomod` など）
+- すぐにPRを作りたい場合
+  - リポジトリのGitHub画面から「Check for updates」を実行（手動トリガ）
+  - もしくは interval を `daily` に変更してpush
+- セキュリティ更新（任意）
+  - リポジトリ設定の「Code security and analysis」で Dependabot Alerts / Security updates を有効化すると、脆弱性ベースの自動PRも有効になります（本設定とは別機能）。
+
 ### エラー方針（ergo）
 - 本テンプレートはエラーライブラリとして [newmo-oss/ergo](https://github.com/newmo-oss/ergo) を利用します。
   - アプリ共通のエラーコードは `internal/apperr` に集約し、`ergo.WithCode` でエラーにコードを付与します。
