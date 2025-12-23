@@ -2,7 +2,8 @@
         protogen proto scaffold scaffold-all clear \
         migrate migrate-dev migrate-test \
         dry-run dry-run-dev dry-run-test \
-        reset-test-db reset-dev-db
+        reset-test-db reset-dev-db \
+        lint
 
 up:
 	docker compose up -d --build
@@ -21,6 +22,18 @@ restart:
 
 test:
 	docker compose exec api ./scripts/test.sh
+
+# ---- lint (golangci-lint) ----
+# ローカルにGoを入れなくても動くようDockerイメージで実行します。
+# 開発中の変更を優先して検査するため、ワークスペースをマウントします。
+lint:
+	@echo "[lint] running golangci-lint via docker image"
+	@docker run --rm -t \
+	  -v $(PWD):/work -w /work \
+	  -v go_mod_cache:/go/pkg/mod \
+	  -v go_build_cache:/root/.cache/go-build \
+	  golangci/golangci-lint:latest \
+	  golangci-lint run ./...
 
 # ---- buf (proto -> gen) ----
 protogen:
