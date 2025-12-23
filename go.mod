@@ -10,13 +10,14 @@ require (
 	github.com/newmo-oss/ergo v0.1.0
 	google.golang.org/protobuf v1.36.11
 	gorm.io/driver/mysql v1.5.7
-	gorm.io/gorm v1.25.10
+	gorm.io/gorm v1.31.1
 )
 
 require (
 	github.com/goccy/go-yaml v1.18.0 // indirect
 	github.com/newmo-oss/go-caller v0.1.0 // indirect
 	golang.org/x/sync v0.18.0 // indirect
+	golang.org/x/text v0.23.0 // indirect
 )
 
 require (
