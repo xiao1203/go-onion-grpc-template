@@ -1,13 +1,14 @@
 package grpc
 
 import (
-	"context"
+    "context"
 
-	"connectrpc.com/connect"
-	samplev1 "github.com/xiao1203/go-onion-grpc-template/gen/sample/v1"
-	"github.com/xiao1203/go-onion-grpc-template/internal/domain"
-	"github.com/xiao1203/go-onion-grpc-template/internal/domain/entity"
-	"github.com/xiao1203/go-onion-grpc-template/internal/usecase"
+    "connectrpc.com/connect"
+    samplev1 "github.com/xiao1203/go-onion-grpc-template/gen/sample/v1"
+    "github.com/xiao1203/go-onion-grpc-template/internal/apperr"
+    "github.com/xiao1203/go-onion-grpc-template/internal/domain"
+    "github.com/xiao1203/go-onion-grpc-template/internal/domain/entity"
+    "github.com/xiao1203/go-onion-grpc-template/internal/usecase"
 )
 
 type SampleHandler struct {
@@ -27,10 +28,10 @@ func (h *SampleHandler) CreateSample(
 		Content: req.Msg.GetContent(),
 		Count:   req.Msg.GetCount(),
 	}
-	out, err := h.uc.Create(ctx, in)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
-	}
+    out, err := h.uc.Create(ctx, in)
+    if err != nil {
+        return nil, apperr.ToConnect(err)
+    }
 	res := connect.NewResponse(&samplev1.CreateSampleResponse{
 		Sample: toProtoSample(out),
 	})
@@ -41,10 +42,10 @@ func (h *SampleHandler) GetSample(
 	ctx context.Context,
 	req *connect.Request[samplev1.GetSampleRequest],
 ) (*connect.Response[samplev1.GetSampleResponse], error) {
-	out, err := h.uc.Get(ctx, req.Msg.GetId())
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
-	}
+    out, err := h.uc.Get(ctx, req.Msg.GetId())
+    if err != nil {
+        return nil, apperr.ToConnect(err)
+    }
 	return connect.NewResponse(&samplev1.GetSampleResponse{Sample: toProtoSample(out)}), nil
 }
 
@@ -53,10 +54,10 @@ func (h *SampleHandler) ListSamples(
 	req *connect.Request[samplev1.ListSamplesRequest],
 ) (*connect.Response[samplev1.ListSamplesResponse], error) {
 	// NOTE: proto currently has no paging fields. Pass defaults.
-	items, err := h.uc.List(ctx, domain.ListParams{})
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
-	}
+    items, err := h.uc.List(ctx, domain.ListParams{})
+    if err != nil {
+        return nil, apperr.ToConnect(err)
+    }
 	out := make([]*samplev1.Sample, 0, len(items))
 	for _, it := range items {
 		out = append(out, toProtoSample(it))
@@ -74,10 +75,10 @@ func (h *SampleHandler) UpdateSample(
 		Content: req.Msg.GetContent(),
 		Count:   req.Msg.GetCount(),
 	}
-	out, err := h.uc.Update(ctx, in)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
-	}
+    out, err := h.uc.Update(ctx, in)
+    if err != nil {
+        return nil, apperr.ToConnect(err)
+    }
 	return connect.NewResponse(&samplev1.UpdateSampleResponse{Sample: toProtoSample(out)}), nil
 }
 
@@ -85,9 +86,9 @@ func (h *SampleHandler) DeleteSample(
 	ctx context.Context,
 	req *connect.Request[samplev1.DeleteSampleRequest],
 ) (*connect.Response[samplev1.DeleteSampleResponse], error) {
-	if err := h.uc.Delete(ctx, req.Msg.GetId()); err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
-	}
+    if err := h.uc.Delete(ctx, req.Msg.GetId()); err != nil {
+        return nil, apperr.ToConnect(err)
+    }
 	return connect.NewResponse(&samplev1.DeleteSampleResponse{}), nil
 }
 

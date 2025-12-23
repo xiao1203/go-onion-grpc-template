@@ -1,13 +1,15 @@
 package mysql
 
 import (
-	"context"
-	"errors"
+    "context"
+    "errors"
 
-	"gorm.io/gorm"
+    "gorm.io/gorm"
 
-	"github.com/xiao1203/go-onion-grpc-template/internal/domain/entity"
-	domainrepo "github.com/xiao1203/go-onion-grpc-template/internal/domain/repository"
+    "github.com/newmo-oss/ergo"
+    "github.com/xiao1203/go-onion-grpc-template/internal/apperr"
+    "github.com/xiao1203/go-onion-grpc-template/internal/domain/entity"
+    domainrepo "github.com/xiao1203/go-onion-grpc-template/internal/domain/repository"
 )
 
 type UserModel struct {
@@ -40,16 +42,16 @@ func NewUserRepository(db *gorm.DB) domainrepo.UserRepository { return &UserRepo
 
 func (r *UserRepository) FindByID(ctx context.Context, id int64) (*entity.User, error) {
 	var u UserModel
-	if err := r.db.WithContext(ctx).First(&u, id).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil
-		}
-		return nil, err
-	}
+    if err := r.db.WithContext(ctx).First(&u, id).Error; err != nil {
+        if errors.Is(err, gorm.ErrRecordNotFound) {
+            return nil, nil
+        }
+        return nil, ergo.WithCode(err, apperr.Internal)
+    }
 	roles, err := r.loadRoles(ctx, id)
-	if err != nil {
-		return nil, err
-	}
+    if err != nil {
+        return nil, ergo.WithCode(err, apperr.Internal)
+    }
 	return &entity.User{
 		ID:          u.ID,
 		Email:       u.Email,
@@ -60,12 +62,12 @@ func (r *UserRepository) FindByID(ctx context.Context, id int64) (*entity.User, 
 }
 
 func (r *UserRepository) UpdateProfile(ctx context.Context, id int64, displayName, pictureURL string) (*entity.User, error) {
-	if err := r.db.WithContext(ctx).Model(&UserModel{}).Where("id = ?", id).Updates(map[string]any{
-		"display_name": displayName,
-		"picture_url":  pictureURL,
-	}).Error; err != nil {
-		return nil, err
-	}
+    if err := r.db.WithContext(ctx).Model(&UserModel{}).Where("id = ?", id).Updates(map[string]any{
+        "display_name": displayName,
+        "picture_url":  pictureURL,
+    }).Error; err != nil {
+        return nil, ergo.WithCode(err, apperr.Internal)
+    }
 	return r.FindByID(ctx, id)
 }
 

@@ -425,6 +425,7 @@ import (
 
     "connectrpc.com/connect"
     {{.GoPkgName}} "{{.Module}}/gen/{{.NameLower}}/v1"
+    "{{.Module}}/internal/apperr"
     "{{.Module}}/internal/domain"
     "{{.Module}}/internal/domain/entity"
     "{{.Module}}/internal/usecase"
@@ -449,7 +450,7 @@ func (h *{{.Name}}Handler) Create{{.Name}}(
     }
     out, err := h.uc.Create(ctx, in)
     if err != nil {
-        return nil, connect.NewError(connect.CodeInternal, err)
+        return nil, apperr.ToConnect(err)
     }
     res := connect.NewResponse(&{{.GoPkgName}}.Create{{.Name}}Response{
         {{.Name}}: toProto{{.Name}}(out),
@@ -463,7 +464,7 @@ func (h *{{.Name}}Handler) Get{{.Name}}(
 ) (*connect.Response[{{.GoPkgName}}.Get{{.Name}}Response], error) {
     out, err := h.uc.Get(ctx, req.Msg.GetId())
     if err != nil {
-        return nil, connect.NewError(connect.CodeInternal, err)
+        return nil, apperr.ToConnect(err)
     }
     return connect.NewResponse(&{{.GoPkgName}}.Get{{.Name}}Response{ {{.Name}}: toProto{{.Name}}(out) }), nil
 }
@@ -474,7 +475,7 @@ func (h *{{.Name}}Handler) List{{.Name}}s(
 ) (*connect.Response[{{.GoPkgName}}.List{{.Name}}sResponse], error) {
     items, err := h.uc.List(ctx, domain.ListParams{})
     if err != nil {
-        return nil, connect.NewError(connect.CodeInternal, err)
+        return nil, apperr.ToConnect(err)
     }
     out := make([]*{{.GoPkgName}}.{{.Name}}, 0, len(items))
     for _, it := range items {
@@ -495,7 +496,7 @@ func (h *{{.Name}}Handler) Update{{.Name}}(
     }
     out, err := h.uc.Update(ctx, in)
     if err != nil {
-        return nil, connect.NewError(connect.CodeInternal, err)
+        return nil, apperr.ToConnect(err)
     }
     return connect.NewResponse(&{{.GoPkgName}}.Update{{.Name}}Response{ {{.Name}}: toProto{{.Name}}(out) }), nil
 }
@@ -505,7 +506,7 @@ func (h *{{.Name}}Handler) Delete{{.Name}}(
     req *connect.Request[{{.GoPkgName}}.Delete{{.Name}}Request],
 ) (*connect.Response[{{.GoPkgName}}.Delete{{.Name}}Response], error) {
     if err := h.uc.Delete(ctx, req.Msg.GetId()); err != nil {
-        return nil, connect.NewError(connect.CodeInternal, err)
+        return nil, apperr.ToConnect(err)
     }
     return connect.NewResponse(&{{.GoPkgName}}.Delete{{.Name}}Response{}), nil
 }
@@ -629,6 +630,8 @@ import (
 
     "gorm.io/gorm"
 
+    "{{.Module}}/internal/apperr"
+    "github.com/newmo-oss/ergo"
     "{{.Module}}/internal/domain"
     "{{.Module}}/internal/domain/entity"
     domainrepo "{{.Module}}/internal/domain/repository"
@@ -656,7 +659,7 @@ func (r *{{.Name}}Repository) Create(ctx context.Context, in *entity.{{.Name}}) 
 {{- end }}
     }
     if err := r.db.WithContext(ctx).Create(&m).Error; err != nil {
-        return nil, err
+        return nil, ergo.WithCode(err, apperr.Internal)
     }
     out := *in
     out.ID = m.ID
@@ -669,7 +672,7 @@ func (r *{{.Name}}Repository) Get(ctx context.Context, id int64) (*entity.{{.Nam
         if errors.Is(err, gorm.ErrRecordNotFound) {
             return nil, nil
         }
-        return nil, err
+        return nil, ergo.WithCode(err, apperr.Internal)
     }
     return &entity.{{.Name}}{
         ID: m.ID,
@@ -684,7 +687,7 @@ func (r *{{.Name}}Repository) List(ctx context.Context, p domain.ListParams) ([]
     p = p.Sanitize()
     q := r.db.WithContext(ctx).Order("id DESC").Offset(p.Offset).Limit(p.Limit)
     if err := q.Find(&rows).Error; err != nil {
-        return nil, err
+        return nil, ergo.WithCode(err, apperr.Internal)
     }
     out := make([]*entity.{{.Name}}, 0, len(rows))
     for _, m := range rows {
@@ -707,13 +710,16 @@ func (r *{{.Name}}Repository) Update(ctx context.Context, in *entity.{{.Name}}) 
         "updated_at": time.Now(),
     }
     if err := r.db.WithContext(ctx).Model(&{{.Name}}Model{}).Where("id = ?", in.ID).Updates(updates).Error; err != nil {
-        return nil, err
+        return nil, ergo.WithCode(err, apperr.Internal)
     }
     return r.Get(ctx, in.ID)
 }
 
 func (r *{{.Name}}Repository) Delete(ctx context.Context, id int64) error {
-    return r.db.WithContext(ctx).Delete(&{{.Name}}Model{}, id).Error
+    if err := r.db.WithContext(ctx).Delete(&{{.Name}}Model{}, id).Error; err != nil {
+        return ergo.WithCode(err, apperr.Internal)
+    }
+    return nil
 }
 `
 

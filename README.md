@@ -54,6 +54,7 @@ curl -sS -X POST -H 'Content-Type: application/json' \
 - 🔌 gRPC（connect-go）
   - HTTP/2 + Unary RPC
 - 🧰 ORM: GORM（MySQL）
+- ❗ エラー: [ergo](https://github.com/newmo-oss/ergo) を採用（コード付与 + スタック保持）
 - 🐳 フル Docker 環境
   - Go API サーバー
   - MySQL 開発 DB
@@ -322,6 +323,21 @@ make protogen
 make dry-run [DROP_FLAGS="--enable-drop"]
 make migrate [DROP_FLAGS="--enable-drop"]
 ```
+
+### エラー方針（ergo）
+- 本テンプレートはエラーライブラリとして [newmo-oss/ergo](https://github.com/newmo-oss/ergo) を利用します。
+  - アプリ共通のエラーコードは `internal/apperr` に集約し、`ergo.WithCode` でエラーにコードを付与します。
+  - gRPC（connect-go）への変換は `apperr.ToConnect(err)` を使用します（`ergo.CodeOf(err)` に応じて `connect.Code*` にマッピング）。
+- よくある使い方
+  - 新規作成: `ergo.New("something bad happened")`
+  - ラップ: `ergo.Wrap(err, "while saving")`
+  - コード付与: `ergo.WithCode(err, apperr.Internal)`
+  - ハンドラ返却: `return nil, apperr.ToConnect(err)`
+
+任意: 静的解析（ergocheck）
+- 必要に応じて、ergo同梱の静的解析器「ergocheck」を導入できます（errors.New や fmt.Errorf の使用、フォーマット文字列の誤用などを検出）。
+- ergocheckはビルド時の実行挙動には影響せず、lint/CI のフェーズで規約違反を検出して失敗させる用途です。
+- 導入は任意です（テンプレートでは同梱していません）。プロジェクト方針に合わせて golangci-lint などへの組み込みをご検討ください。
 
 ### clear の動作（レジストリ方式）
 - 削除対象

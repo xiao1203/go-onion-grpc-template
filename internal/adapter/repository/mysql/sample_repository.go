@@ -2,15 +2,17 @@ package mysql
 
 // scaffold実行のサンプルコードです。不要であれば削除してください。
 import (
-	"context"
-	"errors"
-	"time"
+    "context"
+    "errors"
+    "time"
 
-	"gorm.io/gorm"
+    "gorm.io/gorm"
 
-	"github.com/xiao1203/go-onion-grpc-template/internal/domain"
-	"github.com/xiao1203/go-onion-grpc-template/internal/domain/entity"
-	domainrepo "github.com/xiao1203/go-onion-grpc-template/internal/domain/repository"
+    "github.com/newmo-oss/ergo"
+    "github.com/xiao1203/go-onion-grpc-template/internal/apperr"
+    "github.com/xiao1203/go-onion-grpc-template/internal/domain"
+    "github.com/xiao1203/go-onion-grpc-template/internal/domain/entity"
+    domainrepo "github.com/xiao1203/go-onion-grpc-template/internal/domain/repository"
 )
 
 type SampleModel struct {
@@ -34,9 +36,9 @@ func (r *SampleRepository) Create(ctx context.Context, in *entity.Sample) (*enti
 		Content: in.Content,
 		Count:   in.Count,
 	}
-	if err := r.db.WithContext(ctx).Create(&m).Error; err != nil {
-		return nil, err
-	}
+    if err := r.db.WithContext(ctx).Create(&m).Error; err != nil {
+        return nil, ergo.WithCode(err, apperr.Internal)
+    }
 	out := *in
 	out.ID = m.ID
 	return &out, nil
@@ -44,12 +46,12 @@ func (r *SampleRepository) Create(ctx context.Context, in *entity.Sample) (*enti
 
 func (r *SampleRepository) Get(ctx context.Context, id int64) (*entity.Sample, error) {
 	var m SampleModel
-	if err := r.db.WithContext(ctx).First(&m, id).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil
-		}
-		return nil, err
-	}
+    if err := r.db.WithContext(ctx).First(&m, id).Error; err != nil {
+        if errors.Is(err, gorm.ErrRecordNotFound) {
+            return nil, nil
+        }
+        return nil, ergo.WithCode(err, apperr.Internal)
+    }
 	return &entity.Sample{
 		ID:      m.ID,
 		Name:    m.Name,
@@ -62,9 +64,9 @@ func (r *SampleRepository) List(ctx context.Context, p domain.ListParams) ([]*en
 	var rows []SampleModel
 	p = p.Sanitize()
 	q := r.db.WithContext(ctx).Order("id DESC").Offset(p.Offset).Limit(p.Limit)
-	if err := q.Find(&rows).Error; err != nil {
-		return nil, err
-	}
+    if err := q.Find(&rows).Error; err != nil {
+        return nil, ergo.WithCode(err, apperr.Internal)
+    }
 	out := make([]*entity.Sample, 0, len(rows))
 	for _, m := range rows {
 		it := entity.Sample{
@@ -85,12 +87,15 @@ func (r *SampleRepository) Update(ctx context.Context, in *entity.Sample) (*enti
 		"count":      in.Count,
 		"updated_at": time.Now(),
 	}
-	if err := r.db.WithContext(ctx).Model(&SampleModel{}).Where("id = ?", in.ID).Updates(updates).Error; err != nil {
-		return nil, err
-	}
+    if err := r.db.WithContext(ctx).Model(&SampleModel{}).Where("id = ?", in.ID).Updates(updates).Error; err != nil {
+        return nil, ergo.WithCode(err, apperr.Internal)
+    }
 	return r.Get(ctx, in.ID)
 }
 
 func (r *SampleRepository) Delete(ctx context.Context, id int64) error {
-	return r.db.WithContext(ctx).Delete(&SampleModel{}, id).Error
+    if err := r.db.WithContext(ctx).Delete(&SampleModel{}, id).Error; err != nil {
+        return ergo.WithCode(err, apperr.Internal)
+    }
+    return nil
 }

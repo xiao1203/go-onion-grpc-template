@@ -1,15 +1,16 @@
 package auth
 
 import (
-	"crypto/rsa"
-	"encoding/base64"
-	"encoding/json"
-	"errors"
-	"math/big"
-	"net/http"
-	"strings"
-	"sync"
-	"time"
+    "crypto/rsa"
+    "encoding/base64"
+    "encoding/json"
+    "math/big"
+    "net/http"
+    "strings"
+    "sync"
+    "time"
+
+    "github.com/newmo-oss/ergo"
 )
 
 type jwksKey struct {
@@ -42,11 +43,11 @@ func NewJWKSCache(url string, ttl time.Duration) *JWKSCache {
 }
 
 func (c *JWKSCache) KeyFor(kid string) (*rsa.PublicKey, error) {
-	c.mu.RLock()
-	if k, ok := c.keys[kid]; ok && time.Now().Before(c.expires) {
-		c.mu.RUnlock()
-		return k, nil
-	}
+    c.mu.RLock()
+    if k, ok := c.keys[kid]; ok && time.Now().Before(c.expires) {
+        c.mu.RUnlock()
+        return k, nil
+    }
 	c.mu.RUnlock()
 	// refresh
 	if err := c.refresh(); err != nil {
@@ -54,10 +55,10 @@ func (c *JWKSCache) KeyFor(kid string) (*rsa.PublicKey, error) {
 	}
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	if k, ok := c.keys[kid]; ok {
-		return k, nil
-	}
-	return nil, errors.New("jwks: key not found")
+    if k, ok := c.keys[kid]; ok {
+        return k, nil
+    }
+    return nil, ergo.NewSentinel("jwks: key not found")
 }
 
 func (c *JWKSCache) refresh() error {

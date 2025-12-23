@@ -1,17 +1,18 @@
 package grpc
 
 import (
-	"context"
-	"errors"
-	"os"
-	"strconv"
-	"strings"
-	"sync"
-	"time"
+    "context"
+    "os"
+    "strconv"
+    "strings"
+    "sync"
+    "time"
 
-	"connectrpc.com/connect"
-	"github.com/golang-jwt/jwt/v5"
-	"github.com/xiao1203/go-onion-grpc-template/internal/auth"
+    "connectrpc.com/connect"
+    "github.com/golang-jwt/jwt/v5"
+    "github.com/newmo-oss/ergo"
+    "github.com/xiao1203/go-onion-grpc-template/internal/apperr"
+    "github.com/xiao1203/go-onion-grpc-template/internal/auth"
 )
 
 // AuthUnaryInterceptor enforces auth unless the method is allowlisted.
@@ -52,36 +53,36 @@ func AuthUnaryInterceptor(allowlist map[string]struct{}) connect.UnaryIntercepto
 			}
 
 			authz := req.Header().Get("Authorization")
-			if authz == "" {
-				return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("missing Authorization"))
-			}
-			parts := strings.SplitN(authz, " ", 2)
-			if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
-				return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("invalid Authorization"))
-			}
-			tokenString := parts[1]
-			hs := os.Getenv("AUTH_HS256_SECRET")
-			if hs == "" {
-				return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("no verifier configured"))
-			}
-			token, err := jwt.Parse(tokenString, func(t *jwt.Token) (interface{}, error) {
-				if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-					return nil, errors.New("invalid signing method")
-				}
-				return []byte(hs), nil
-			})
-			if err != nil || !token.Valid {
-				return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("invalid token"))
-			}
-			claims, ok := token.Claims.(jwt.MapClaims)
-			if !ok {
-				return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("invalid claims"))
-			}
-			if exp, ok := claims["exp"].(float64); ok {
-				if time.Now().Unix() > int64(exp) {
-					return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("token expired"))
-				}
-			}
+            if authz == "" {
+                return nil, apperr.ToConnect(ergo.WithCode(ergo.New("missing Authorization"), apperr.Unauthenticated))
+            }
+            parts := strings.SplitN(authz, " ", 2)
+            if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
+                return nil, apperr.ToConnect(ergo.WithCode(ergo.New("invalid Authorization"), apperr.Unauthenticated))
+            }
+            tokenString := parts[1]
+            hs := os.Getenv("AUTH_HS256_SECRET")
+            if hs == "" {
+                return nil, apperr.ToConnect(ergo.WithCode(ergo.New("no verifier configured"), apperr.Unauthenticated))
+            }
+            token, err := jwt.Parse(tokenString, func(t *jwt.Token) (interface{}, error) {
+                if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+                    return nil, ergo.New("invalid signing method")
+                }
+                return []byte(hs), nil
+            })
+            if err != nil || !token.Valid {
+                return nil, apperr.ToConnect(ergo.WithCode(ergo.New("invalid token"), apperr.Unauthenticated))
+            }
+            claims, ok := token.Claims.(jwt.MapClaims)
+            if !ok {
+                return nil, apperr.ToConnect(ergo.WithCode(ergo.New("invalid claims"), apperr.Unauthenticated))
+            }
+            if exp, ok := claims["exp"].(float64); ok {
+                if time.Now().Unix() > int64(exp) {
+                    return nil, apperr.ToConnect(ergo.WithCode(ergo.New("token expired"), apperr.Unauthenticated))
+                }
+            }
 			var uid int64
 			if sub, ok := claims["sub"].(string); ok {
 				if v, err := strconv.ParseInt(sub, 10, 64); err == nil {
@@ -125,26 +126,26 @@ func jwksCacheSingleton(url string, ttl time.Duration) *auth.JWKSCache {
 }
 
 func withJWTFromHeader(ctx context.Context, req connect.AnyRequest, keyfunc jwt.Keyfunc, claimCheck func(jwt.MapClaims) error) (context.Context, error) {
-	authz := req.Header().Get("Authorization")
-	if authz == "" {
-		return ctx, connect.NewError(connect.CodeUnauthenticated, errors.New("missing Authorization"))
-	}
-	parts := strings.SplitN(authz, " ", 2)
-	if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
-		return ctx, connect.NewError(connect.CodeUnauthenticated, errors.New("invalid Authorization"))
-	}
-	tokenString := parts[1]
-	token, err := jwt.Parse(tokenString, keyfunc)
-	if err != nil || !token.Valid {
-		return ctx, connect.NewError(connect.CodeUnauthenticated, errors.New("invalid token"))
-	}
-	claims, ok := token.Claims.(jwt.MapClaims)
-	if !ok {
-		return ctx, connect.NewError(connect.CodeUnauthenticated, errors.New("invalid claims"))
-	}
-	if err := claimCheck(claims); err != nil {
-		return ctx, connect.NewError(connect.CodeUnauthenticated, err)
-	}
+    authz := req.Header().Get("Authorization")
+    if authz == "" {
+        return ctx, apperr.ToConnect(ergo.WithCode(ergo.New("missing Authorization"), apperr.Unauthenticated))
+    }
+    parts := strings.SplitN(authz, " ", 2)
+    if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
+        return ctx, apperr.ToConnect(ergo.WithCode(ergo.New("invalid Authorization"), apperr.Unauthenticated))
+    }
+    tokenString := parts[1]
+    token, err := jwt.Parse(tokenString, keyfunc)
+    if err != nil || !token.Valid {
+        return ctx, apperr.ToConnect(ergo.WithCode(ergo.New("invalid token"), apperr.Unauthenticated))
+    }
+    claims, ok := token.Claims.(jwt.MapClaims)
+    if !ok {
+        return ctx, apperr.ToConnect(ergo.WithCode(ergo.New("invalid claims"), apperr.Unauthenticated))
+    }
+    if err := claimCheck(claims); err != nil {
+        return ctx, apperr.ToConnect(ergo.WithCode(err, apperr.Unauthenticated))
+    }
 	var uid int64
 	if sub, ok := claims["sub"].(string); ok {
 		if v, err := strconv.ParseInt(sub, 10, 64); err == nil {
@@ -173,42 +174,42 @@ func verifyStandardClaims() func(jwt.MapClaims) error {
 			skew = d
 		}
 	}
-	return func(c jwt.MapClaims) error {
-		now := time.Now()
-		if iss != "" {
-			if v, _ := c["iss"].(string); v != iss {
-				return errors.New("issuer mismatch")
-			}
-		}
-		if audWant != "" {
-			switch aud := c["aud"].(type) {
-			case string:
-				if aud != audWant {
-					return errors.New("audience mismatch")
-				}
-			case []any:
-				ok := false
-				for _, a := range aud {
-					if s, _ := a.(string); s == audWant {
-						ok = true
-						break
-					}
-				}
-				if !ok {
-					return errors.New("audience mismatch")
-				}
-			}
-		}
-		if exp, ok := c["exp"].(float64); ok {
-			if now.After(time.Unix(int64(exp), 0).Add(skew)) {
-				return errors.New("token expired")
-			}
-		}
-		if nbf, ok := c["nbf"].(float64); ok {
-			if now.Before(time.Unix(int64(nbf), 0).Add(-skew)) {
-				return errors.New("token not yet valid")
-			}
-		}
-		return nil
-	}
+    return func(c jwt.MapClaims) error {
+        now := time.Now()
+        if iss != "" {
+            if v, _ := c["iss"].(string); v != iss {
+                return ergo.New("issuer mismatch")
+            }
+        }
+        if audWant != "" {
+            switch aud := c["aud"].(type) {
+            case string:
+                if aud != audWant {
+                    return ergo.New("audience mismatch")
+                }
+            case []any:
+                ok := false
+                for _, a := range aud {
+                    if s, _ := a.(string); s == audWant {
+                        ok = true
+                        break
+                    }
+                }
+                if !ok {
+                    return ergo.New("audience mismatch")
+                }
+            }
+        }
+        if exp, ok := c["exp"].(float64); ok {
+            if now.After(time.Unix(int64(exp), 0).Add(skew)) {
+                return ergo.New("token expired")
+            }
+        }
+        if nbf, ok := c["nbf"].(float64); ok {
+            if now.Before(time.Unix(int64(nbf), 0).Add(-skew)) {
+                return ergo.New("token not yet valid")
+            }
+        }
+        return nil
+    }
 }
