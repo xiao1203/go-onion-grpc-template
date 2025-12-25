@@ -355,6 +355,8 @@ make clear Article [drop=1]  # 生成物とschemaの該当ブロックを削除�
 make protogen
 make dry-run [DROP_FLAGS="--enable-drop"]
 make migrate [DROP_FLAGS="--enable-drop"]
+make modernize                 # gopls の modernize/自動修正を適用
+make modernize-diff            # 変更点のみ diff 表示（書き込みしない）
 ```
 
 ### Dependabot（自動依存アップデート）
@@ -408,3 +410,37 @@ GitHub Actions（CI）
 ## 変更履歴
 
 タグ/バージョンごとの詳細は CHANGELOG.md を参照してください。
+
+---
+
+## 自動リファクタ（modernize）
+
+`gopls` の Code Action を利用して、`golang.org/x/tools/gopls/internal/analysis/modernize` を含む "modernize" 系の自動修正を一括適用できます。
+
+- 実行（書き込み適用）
+
+```
+make modernize
+```
+
+- 差分だけ確認（dry-run）
+
+```
+make modernize-diff
+```
+
+動作の詳細
+- `scripts/modernize.sh` が `gopls codeaction` を使い、既定で `source.fixAll` を各 `*.go` に適用します。
+- ローカルに `gopls` がない場合は `docker compose run --rm -T api`（コンテナ内）で実行します。
+- ビルドキャッシュはリポジトリ直下の `.gocache` / `.gomodcache` を利用するため、権限エラーを避けられます。
+
+オプション（環境変数）
+- `KIND`  … CodeActionKind（既定: `source.fixAll`）
+- `TITLE` … アクションタイトルで絞り込み（例: `TITLE=modernize`）
+- `MODE`  … `write`/`diff`/`list`（make ターゲットで設定済み）
+
+例）modernize タイトルに一致するアクションだけを diff で確認
+
+```
+TITLE=modernize MODE=diff make modernize-diff
+```

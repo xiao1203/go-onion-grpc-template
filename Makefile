@@ -3,7 +3,7 @@
         migrate migrate-dev migrate-test \
         dry-run dry-run-dev dry-run-test \
         reset-test-db reset-dev-db \
-        lint
+        lint modernize modernize-diff
 
 # ---- dev-only guard -----------------------------------------------
 # 破壊的/生成系ターゲットは開発環境のみ実行可能にします。
@@ -50,6 +50,22 @@ lint:
 	  -v go_build_cache:/root/.cache/go-build \
 	  golangci/golangci-lint:latest \
 	  golangci-lint run ./...
+
+# ---- modernize (gopls codeaction) ----
+# gopls の modernize 系アナライザを含む "source.fixAll" を実行し、
+# 可能なコードアクション（自動リファクタ）を適用します。
+# - 実体は scripts/modernize.sh
+# - 変更を適用: make modernize
+# - 差分のみ確認: make modernize-diff
+# オプション環境変数:
+#   KIND  ... デフォルトは source.fixAll（任意の CodeActionKind を指定可）
+#   TITLE ... Code Action のタイトルで絞り込み（例: TITLE=modernize）
+#   MODE  ... write/diff/list（ターゲットで既定設定済み）
+modernize:
+	@bash ./scripts/modernize.sh
+
+modernize-diff:
+	@MODE=diff bash ./scripts/modernize.sh
 
 # ---- buf (proto -> gen) ----
 protogen:
