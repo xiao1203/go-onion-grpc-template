@@ -24,6 +24,8 @@ coverage/
 coverage*.out
 profile*.out
 *.test
+.gocache/
+.gomodcache/
 
 # --- Go modules / workspace ---
 vendor/

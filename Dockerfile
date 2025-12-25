@@ -11,6 +11,9 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends default-mysql-client \
  && rm -rf /var/lib/apt/lists/*
 
+# gopls を導入して、コンテナ内でも modernize が使えるようにする
+RUN go install golang.org/x/tools/gopls@latest
+
 COPY . .
 
 EXPOSE 8080
