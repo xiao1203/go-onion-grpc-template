@@ -13,6 +13,13 @@ Go 言語で **オニオンアーキテクチャ + gRPC（connect-go）** を採
 
 ## クイックスタート（雛形生成〜疎通まで）
 
+注意（Makeガード）
+- `scaffold`/`scaffold-all`/`migrate` など一部ターゲットは「開発専用」です。
+- 実行時は次のいずれかで許可してください。
+  - `APP_ENV=dev` を付与する（例: `export APP_ENV=dev`）
+  - `ALLOW_DEV=1` を付与する（例: `export ALLOW_DEV=1`）
+  - 目印ファイル `.dev-allow` を作成する（ローカル常時許可・.gitignore済み）
+
 1) 起動（初回はコンテナを構築）
 
 ```
@@ -22,7 +29,7 @@ make up
 2) 例：Article エンティティを生成（name:string, content:string）
 
 ```
-make scaffold-all name=Article fields="name:string content:string"
+APP_ENV=dev make scaffold-all name=Article fields="name:string content:string"
 ```
 
 実行内容（自動）
@@ -257,6 +264,32 @@ make dry-run
 make reset-test-db
 ```
 
+### Make ガード（開発専用ターゲット）
+
+破壊的/生成系の make ターゲットは「開発環境のみ実行可能」となるガードを設けています。誤操作で本番等に影響を出さない目的です。
+
+- 許可のいずれかが満たされる場合のみ実行可
+  - 環境変数で許可: `APP_ENV=dev` を付与
+  - 明示許可フラグ: `ALLOW_DEV=1` を付与
+  - 目印ファイル: リポジトリ直下に `.dev-allow` を作成（ローカル常時許可・既に `.gitignore` 済み）
+
+- 制限対象（= 開発専用）
+  - `scaffold` / `scaffold-clean` / `clear` / `scaffold-all`
+  - `migrate` / `migrate-dev` / `migrate-test` / `dry-run*`
+  - `reset-test-db` / `reset-dev-db`
+
+- 制限しない（常時実行可）
+  - `lint` / `test` / `protogen` / `up` / `down` / `logs` / `sh` / `restart`
+
+- 使い方例
+  - 単発で許可: ``APP_ENV=dev make scaffold name=User fields="name:string"``
+  - 明示フラグ: ``ALLOW_DEV=1 make migrate``
+  - ローカル常時許可: ``touch .dev-allow``（コミットしない運用を想定）
+
+- CI で `migrate` 等を実行したい場合
+  - ジョブ環境で `APP_ENV=dev` もしくは `ALLOW_DEV=1` を設定してください
+  - `lint` / `test` はこのガードの対象外のため、設定不要で実行できます
+
 ### Docker Compose 構成
 ### API コンテナ
 Go 1.24  
@@ -322,6 +355,8 @@ make clear Article [drop=1]  # 生成物とschemaの該当ブロックを削除�
 make protogen
 make dry-run [DROP_FLAGS="--enable-drop"]
 make migrate [DROP_FLAGS="--enable-drop"]
+make modernize                 # gopls の modernize/自動修正を適用
+make modernize-diff            # 変更点のみ diff 表示（書き込みしない）
 ```
 
 ### Dependabot（自動依存アップデート）
@@ -375,3 +410,37 @@ GitHub Actions（CI）
 ## 変更履歴
 
 タグ/バージョンごとの詳細は CHANGELOG.md を参照してください。
+
+---
+
+## 自動リファクタ（modernize）
+
+`gopls` の Code Action を利用して、`golang.org/x/tools/gopls/internal/analysis/modernize` を含む "modernize" 系の自動修正を一括適用できます。
+
+- 実行（書き込み適用）
+
+```
+make modernize
+```
+
+- 差分だけ確認（dry-run）
+
+```
+make modernize-diff
+```
+
+動作の詳細
+- `scripts/modernize.sh` が `gopls codeaction` を使い、既定で `source.fixAll` を各 `*.go` に適用します。
+- ローカルに `gopls` がない場合は `docker compose run --rm -T api`（コンテナ内）で実行します。
+- ビルドキャッシュはリポジトリ直下の `.gocache` / `.gomodcache` を利用するため、権限エラーを避けられます。
+
+オプション（環境変数）
+- `KIND`  … CodeActionKind（既定: `source.fixAll`）
+- `TITLE` … アクションタイトルで絞り込み（例: `TITLE=modernize`）
+- `MODE`  … `write`/`diff`/`list`（make ターゲットで設定済み）
+
+例）modernize タイトルに一致するアクションだけを diff で確認
+
+```
+TITLE=modernize MODE=diff make modernize-diff
+```

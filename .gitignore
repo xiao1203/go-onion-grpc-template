@@ -1,0 +1,59 @@
+# --- OS / Editor ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.code-workspace
+*.iml
+*.swp
+*.swo
+*.sw?
+*~
+.history/
+
+# --- Go build artifacts ---
+bin/
+build/
+dist/
+out/
+debug
+coverage/
+*.cover
+*.coverprofile
+*.cov
+coverage*.out
+profile*.out
+*.test
+.gocache/
+.gomodcache/
+
+# --- Go modules / workspace ---
+vendor/
+go.work
+go.work.sum
+
+# --- Local env / Docker overrides ---
+.env
+.env.local
+.env.*.local
+docker-compose.override.yml
+
+# --- Logs / temp ---
+*.log
+tmp/
+.tmp/
+.temp/
+*.tmp
+
+# --- Platform-specific binaries ---
+*.exe
+*.dll
+*.so
+*.dylib
+
+# --- Project specific ---
+# 開発許可用の目印ファイル（コミットしない）
+.dev-allow
+
+# 注意: proto生成物はリポジトリで管理するため `gen/` は無視しない
+# 注意: `proto/` も無視しない（scaffoldで追加したIDLを管理）

@@ -62,11 +62,11 @@ func (c *JWKSCache) KeyFor(kid string) (*rsa.PublicKey, error) {
 }
 
 func (c *JWKSCache) refresh() error {
-	resp, err := c.client.Get(c.url)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
+    resp, err := c.client.Get(c.url)
+    if err != nil {
+        return err
+    }
+    defer func() { _ = resp.Body.Close() }()
 	var doc jwksDoc
 	if err := json.NewDecoder(resp.Body).Decode(&doc); err != nil {
 		return err
