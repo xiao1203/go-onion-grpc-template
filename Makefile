@@ -5,6 +5,22 @@
         reset-test-db reset-dev-db \
         lint
 
+# ---- dev-only guard -----------------------------------------------
+# 破壊的/生成系ターゲットは開発環境のみ実行可能にします。
+# 許可条件（いずれかを満たす）
+#  - 環境変数 APP_ENV=dev
+#  - 環境変数 ALLOW_DEV=1（明示許可）
+#  - リポジトリ直下に .dev-allow ファイルが存在
+APP_ENV ?=
+ALLOW_DEV ?= 0
+DEV_ALLOW_FILE ?= .dev-allow
+define dev_only
+	@if [ "$(APP_ENV)" != "dev" ] && [ "$(ALLOW_DEV)" != "1" ] && [ ! -f "$(DEV_ALLOW_FILE)" ]; then \
+	  echo "[guard] このターゲットは開発環境専用です。APP_ENV=dev または ALLOW_DEV=1 を指定するか、$(DEV_ALLOW_FILE) を作成してください。"; \
+	  exit 1; \
+	fi
+endef
+
 up:
 	docker compose up -d --build
 
@@ -46,6 +62,7 @@ proto: protogen
 # 例: make scaffold name=User fields="name:string email:string age:int"
 SC_NAME := $(if $(strip $(name)),$(strip $(name)),$(word 2,$(MAKECMDGOALS)))
 scaffold:
+	$(call dev_only)
 		@if [ -z "$(strip $(SC_NAME))" ] || [ -z "$(strip $(fields))" ]; then \
 			echo "Usage: make scaffold name=Entity fields=\"k1:t1 k2:t2 ...\""; \
 			exit 1; \
@@ -57,6 +74,7 @@ scaffold:
 # 生成物クリーンアップ（同名エンティティを作り直す場合に使用）
 # 例: make scaffold-clean name=Article
 scaffold-clean:
+	$(call dev_only)
 	@name='$(name)'; \
     snake=$$(printf "%s" $$name | sed -E 's/([A-Z])/_\1/g' | sed -E 's/^_//' | tr '[:upper:]' '[:lower:]'); \
     rm -rf proto/$$snake gen/$$snake \
@@ -73,6 +91,7 @@ scaffold-clean:
 # 第二引数（エンティティ名）を拾って scaffold-clean を呼び出します
 CLEAR_NAME := $(word 2,$(MAKECMDGOALS))
 clear:
+	$(call dev_only)
 	@if [ -z "$(CLEAR_NAME)" ]; then \
 		echo "Usage: make clear <Name>"; exit 1; \
 	fi
@@ -110,6 +129,7 @@ endif
 
 # フルセット: 起動 -> scaffold -> 生成 -> マイグレーション -> コマンド例出力
 scaffold-all:
+	$(call dev_only)
 	$(MAKE) up
 	$(MAKE) scaffold name="$(SC_NAME)" fields="$(strip $(fields))"
 	$(MAKE) migrate
@@ -162,40 +182,52 @@ TEST_DB_NAME ?= app_test
 SCHEMA_FILE ?= db/schema.sql
 
 # dev/test 両方に適用
-migrate: migrate-dev migrate-test
+migrate: 
+	$(call dev_only)
+	$(MAKE) migrate-dev
+	$(MAKE) migrate-test
 
 DROP_FLAGS ?=
 
 migrate-dev:
+	$(call dev_only)
 	docker compose run --rm -T mysqldef \
 	  -h $(DEV_DB_HOST) -P $(DEV_DB_PORT) -u$(DB_USER) -p$(DB_PASS) \
 	  --apply $(DROP_FLAGS) $(DEV_DB_NAME) < $(SCHEMA_FILE)
 
 migrate-test:
+	$(call dev_only)
 	docker compose run --rm -T mysqldef \
 	  -h $(TEST_DB_HOST) -P $(TEST_DB_PORT) -u$(DB_USER) -p$(DB_PASS) \
 	  --apply $(DROP_FLAGS) $(TEST_DB_NAME) < $(SCHEMA_FILE)
 
-dry-run: dry-run-dev dry-run-test
+dry-run:
+	$(call dev_only)
+	$(MAKE) dry-run-dev
+	$(MAKE) dry-run-test
 
 dry-run-dev:
+	$(call dev_only)
 	docker compose run --rm -T mysqldef \
 	  -h $(DEV_DB_HOST) -P $(DEV_DB_PORT) -u$(DB_USER) -p$(DB_PASS) \
 	  --dry-run $(DROP_FLAGS) $(DEV_DB_NAME) < $(SCHEMA_FILE)
 
 dry-run-test:
+	$(call dev_only)
 	docker compose run --rm -T mysqldef \
 	  -h $(TEST_DB_HOST) -P $(TEST_DB_PORT) -u$(DB_USER) -p$(DB_PASS) \
 	  --dry-run $(DROP_FLAGS) $(TEST_DB_NAME) < $(SCHEMA_FILE)
 
 # テストDBを完全リセット（tmpfsでも、コンテナが生きてる間は状態が残るため）
 reset-test-db:
+	$(call dev_only)
 	docker compose rm -sf mysql_test
 	docker compose up -d mysql_test
 	$(MAKE) migrate-test
 
 # 開発DB(app_dev)を完全リセット（状態が怪しい時の復旧用）
 reset-dev-db:
+	$(call dev_only)
 	docker compose rm -sf mysql_dev
 	docker compose up -d mysql_dev
 	$(MAKE) migrate-dev
