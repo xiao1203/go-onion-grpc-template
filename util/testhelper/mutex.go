@@ -7,7 +7,10 @@ import (
 	"time"
 )
 
-const maxConcurrency = 10
+// DB 依存テストの並列実行はフィクスチャ投入や TRUNCATE による
+// デッドロックを引き起こす可能性があるため、CI 安定性を優先して
+// 直列化（1スロット）に設定する。
+const maxConcurrency = 1
 const mutexTimeout = 30 * time.Second
 
 // Lock acquires an inter-process lock for tests that depend on external
