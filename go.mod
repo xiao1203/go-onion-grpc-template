@@ -2,12 +2,12 @@ module github.com/xiao1203/go-onion-grpc-template
 
 go 1.24.11
 
-require connectrpc.com/connect v1.19.1
+require connectrpc.com/connect v1.19.2
 
 require (
 	github.com/go-sql-driver/mysql v1.9.3
-	github.com/golang-jwt/jwt/v5 v5.3.0
-	github.com/newmo-oss/ergo v0.1.0
+	github.com/golang-jwt/jwt/v5 v5.3.1
+	github.com/newmo-oss/ergo v0.1.2
 	google.golang.org/protobuf v1.36.11
 	gorm.io/driver/mysql v1.6.0
 	gorm.io/gorm v1.31.1
@@ -17,7 +17,7 @@ require (
 	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/goccy/go-yaml v1.18.0 // indirect
 	github.com/newmo-oss/go-caller v0.1.0 // indirect
-	golang.org/x/sync v0.18.0 // indirect
+	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/text v0.23.0 // indirect
 )
 
