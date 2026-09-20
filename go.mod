@@ -1,8 +1,8 @@
 module github.com/xiao1203/go-onion-grpc-template
 
-go 1.24.11
+go 1.25.0
 
-require connectrpc.com/connect v1.19.2
+require connectrpc.com/connect v1.21.0
 
 require (
 	github.com/go-sql-driver/mysql v1.9.3
